@@ -1,0 +1,73 @@
+---
+title: "2020_07_15_SZToM_paired_Oxy"
+author: "Jake Portanova"
+date: "7/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Downloads")
+tom <- read.csv("LIWC2015_results_PORQ_geometricShapes_transcripts_nosource.csv")
+tom <- tom[1:762,]
+library(ggplot2)
+library(dplyr)
+tom$Case <- as.factor(tom$Case)
+tom$SourceC <- tom$Source..C.
+tom$SourceC <- as.factor(tom$SourceC)
+tom$SourceC <- gsub("[0-9.+]", "", tom$SourceC)
+# tom$SourceC <- factor(tom$SourceC, ,levels=c("random","goal","tom"))
+# tom <- tom[,c(1,2,6:99)]
+tom <- tom[complete.cases(tom),]
+tom$Case <- as.numeric(as.character(tom$Case))
+
+tom <- tom %>% rename(Day = Source..B.)
+tom$Day <- as.factor(tom$Day)
+tom <- tom %>% mutate(IDDay = paste(Source..A.,Day,sep="_"))
+drugunbind <- read.csv("PORQ_drugUnblinding.csv")
+drugunbind <- drugunbind %>% mutate(IDDay = paste(participantID,day,sep="_"))
+tom <- full_join(tom, drugunbind, by="IDDay")
+tom <- tom %>% rename(Oxytocin = drugCondition)
+tom <- tom %>% filter(Case == '7')
+library(tidyr)
+tom <- tom %>% mutate(IDDrug = paste(Source..A.,Oxytocin, sep="_"))
+data2 <- tom %>% group_by(IDDrug) %>% summarise_all(funs(mean))
+data2 <- data2[-c(23,42),]
+data2$Oxy <- substr(data2$IDDrug,6,7)
+data3 <- data2 %>% filter(Oxy == "PL")
+data4 <- data2 %>% filter(Oxy == "OT")
+colnames(data4) <- paste(colnames(data4),"1", sep = ".")
+data5 <- cbind(data3,data4)
+```
+
+```{r}
+a <- data.frame()
+for(i in 7:99){
+  gg <- ggplot(data5, aes_string(x='Case', y=data5[,i]))+geom_boxplot()+ggtitle(colnames(data5)[i])
+  var1 <- colnames(data5)[i]
+  var2 <- colnames(data5)[i+106]
+  t <- t.test(data5[,var1], data5[,var2], paired = TRUE, alternative = "two.sided")
+  a[i-6,c('p_value')] <- t$p.value
+  a[i-6,c('var')] <- colnames(data5)[i]
+  a[i-6,c("diff")] <- mean(data5[,i+106]) - mean(data5[,i])
+#  a[i-6,c("mean_pl")] <- mean(data5[,i])
+ # a[i-6,c("mean_ot")] <- mean(data5[,i+106])
+  #   library(broom)
+  #   library(dplyr)
+  # a <- data5 %>% group_by(Status) %>% do(tidy(t.test(data5[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(p_value),]
+detach(a)
+print(newdata)
+#data <- order(data$p.value) 
+#print(data)
+data5$Oxy <- as.factor(data5$Oxy)
+for(i in 7:99){
+  var1 <- newdata$var[i-6]
+  var2 <- paste0(newdata$var[i-6],".1")
+  print(ggplot(data5, aes_string(x='Oxy', y=data5[,newdata$var[i-6]],fill="Oxy",group="Oxy"))+geom_boxplot()+ggtitle(newdata$var[i-6]))
+  print(t.test(data5[,var1], data5[,var2],paired = TRUE))
+}
+```

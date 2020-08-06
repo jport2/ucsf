@@ -1,0 +1,79 @@
+---
+title: "2020_07_15_SZToM_Coherence"
+author: "Jake Portanova"
+date: "7/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Downloads")
+tom <- read.csv("LIWC2015_results_PORQ_geometricShapes_transcripts_nosource.csv")
+tom <- tom[1:762,]
+
+coherence <- read.csv("tom/coherenceresult.csv")
+library(dplyr)
+#tom <- tom %>% select(one_of('Case','Source..A.','Source..C.','WPS','cogproc','tentat','nonflu'))
+#coherence <- coherence %>% select(one_of('file',"sentmean","wordmean"))
+tom <- tom %>% mutate(file = paste0(tom$Source..A.,"_",tom$Source..C.,".txt"))
+tom$file <- as.character(tom$file)
+
+coherence$file <- as.character(coherence$file)
+tom2 <- inner_join(tom,coherence,by='file')
+tom3 <- tom2[complete.cases(tom2),]
+tom <- tom3
+library(ggplot2)
+library(dplyr)
+tom$Case <- as.factor(tom$Case)
+tom$SourceC <- tom$Source..C.
+tom$SourceC <- as.factor(tom$SourceC)
+tom$SourceC <- gsub("[0-9.+]", "", tom$SourceC)
+# tom$SourceC <- factor(tom$SourceC, ,levels=c("random","goal","tom"))
+# tom <- tom[,c(1,2,6:99)]
+tom <- tom[complete.cases(tom),]
+tom$Case <- as.numeric(as.character(tom$Case))
+
+tom <- tom %>% rename(Day = Source..B.)
+tom$Day <- as.factor(tom$Day)
+tom <- tom %>% mutate(IDDay = paste(Source..A.,Day,sep="_"))
+drugunbind <- read.csv("PORQ_drugUnblinding.csv")
+drugunbind <- drugunbind %>% mutate(IDDay = paste(participantID,day,sep="_"))
+tom <- full_join(tom, drugunbind, by="IDDay")
+tom <- tom %>% rename(Oxytocin = drugCondition)
+tom <- tom %>% mutate_at(c('Oxytocin'), ~replace(., is.na(.), 'PL'))
+tom <- tom %>% filter(Oxytocin == 'PL')
+tom <- tom[complete.cases(tom$Case),]
+tom <- tom %>% group_by(Source..A.) %>% summarise_all(funs(mean))
+tom <- as.data.frame(tom)
+tom <- tom[,c(2,101:135)]
+```
+
+```{r}
+a <- data.frame()
+data <- tom %>% group_by(Case) %>% summarise_all(funs(mean))
+for(i in 2:36){
+  var1 <- colnames(tom)[i]
+  t <- t.test(tom[,var1]~tom$Case, alternative = "two.sided")
+  a[i-1,c('p_value')] <- t$p.value
+  a[i-1,c('var')] <- colnames(tom)[i]
+  a[i-1,c("mean_7")] <- data[1,i]
+  a[i-1,c("mean_8")] <- data[2,i]
+  
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(p_value),]
+detach(a)
+print(newdata)
+#data <- order(data$p.value) 
+#print(data)
+#newdata <- newdata[1:91,]
+for(i in 2:36){
+  var1 <- newdata$var[i-1]
+  print(ggplot(tom, aes_string(x='Case', y=tom[,newdata$var[i-1]], fill='Case',group='Case'))+geom_boxplot()+ggtitle(newdata$var[i-1]))
+print(t.test(tom[,var1]~tom$Case))
+}
+```
