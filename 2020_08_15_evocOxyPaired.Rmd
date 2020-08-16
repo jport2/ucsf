@@ -1,0 +1,89 @@
+---
+title: "2020_08_15_evocOxyPaired"
+author: "Jake Portanova"
+date: "August 15, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xlsx)
+library(dplyr)
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+data$Case <- substr(data$IDDay,1,1)
+data <- data %>% filter(Case == "7")
+# read in tom
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc <- read.csv("LIWC2015 Results (emotextfiles (1732 files)).csv")
+evoc$Filename <- as.character(evoc$Filename)
+evoc$id <- sapply(strsplit(evoc$Filename, "_"), "[", 1)
+evoc$emo <- sapply(strsplit(evoc$Filename, "_"), "[", 2)
+evoc$thing <- sapply(strsplit(evoc$Filename, "_"), "[", 3)
+evoc$IDstimulus <- paste(evoc$id,evoc$emo,evoc$thing, sep="_")
+
+data$IDstimulus <- paste(data$participantID.x,data$stimulus, sep="_")
+# make id stimulus variable
+data <- left_join(data, evoc, by="IDstimulus")
+data2 <- data
+# create ID treatment
+# group_by id treatment
+#data2 <- data2 %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+data_oxy <- data2 %>% filter(drugCondition == "OT")
+data_oxy <- data_oxy %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+# group_by id
+data_pl <- data2 %>% filter(drugCondition == "PL")
+data_pl <- data_pl %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+
+# group_by id
+colnames(data_pl) <- paste(colnames(data_pl),"1", sep = ".")
+data5 <- cbind(data_oxy,data_pl)
+data5 <- data5[complete.cases(data5$Analytic),]
+```
+
+```{r}
+a <- data.frame()
+for(i in 18:110){
+ # gg <- ggplot(data5, aes_string(x='Case', y=data5[,i]))+geom_boxplot()+ggtitle(colnames(data5)[i])
+  var1 <- colnames(data5)[i]
+  var2 <- colnames(data5)[i+113]
+  t <- t.test(data5[,var1], data5[,var2], paired = TRUE, alternative = "two.sided")
+  a[i-17,c('p_value')] <- t$p.value
+  a[i-17,c('var')] <- colnames(data5)[i]
+  #a[i-6,c("diff")] <- mean(data5[,i+106]) - mean(data5[,i])
+  a[i-17,c("mean_ot")] <- mean(data5[,i],na.rm=TRUE)
+  a[i-17,c("mean_pl")] <- mean(data5[,i+113],na.rm=TRUE)
+  #   library(broom)
+  #   library(dplyr)
+  # a <- data5 %>% group_by(Status) %>% do(tidy(t.test(data5[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(p_value),]
+detach(a)
+print(newdata)
+#data <- order(data$p.value) 
+#print(data)
+# data5$Oxy <- as.factor(data5$Oxy)
+# for(i in 7:99){
+#   var1 <- newdata$var[i-6]
+#   var2 <- paste0(newdata$var[i-6],".1")
+#   print(ggplot(data5, aes_string(x='Oxy', y=data5[,newdata$var[i-6]],fill="Oxy",group="Oxy"))+geom_boxplot()+ggtitle(newdata$var[i-6]))
+#   print(t.test(data5[,var1], data5[,var2],paired = TRUE))
+# }
+
+#colnames(data_pl)
+
+```
+

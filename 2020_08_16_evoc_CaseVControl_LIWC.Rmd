@@ -1,0 +1,76 @@
+---
+title: "2020_08_16_evoc_CaseVControl_LIWC"
+author: "Jake Portanova"
+date: "August 16, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xlsx)
+library(dplyr)
+library(ggplot2)
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data <- data %>% filter(drugCondition == "PL")
+# set wd
+setwd("evocativeVideoTask")
+# read in liwc
+evoc <- read.csv("LIWC2015 Results (emotextfiles (1732 files)).csv")
+evoc$Filename <- as.character(evoc$Filename)
+evoc$id <- sapply(strsplit(evoc$Filename, "_"), "[", 1)
+evoc$emo <- sapply(strsplit(evoc$Filename, "_"), "[", 2)
+evoc$thing <- sapply(strsplit(evoc$Filename, "_"), "[", 3)
+evoc$IDstimulus <- paste(evoc$id,evoc$emo,evoc$thing, sep="_")
+
+data$IDstimulus <- paste(data$participantID.y,data$stimulus, sep="_")
+data2 <- data
+# make id stimulus variable
+data3 <- right_join(data2, evoc, by="IDstimulus")
+# merge liwc with 
+data3$Case <- substr(data3$participantID.y,1,1)
+```
+
+```{r output}
+data4 <- data3 %>% group_by(Case) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+a <- data.frame()
+for(i in 17:109){
+  var1 <- colnames(data3)[i]
+  t <- t.test(data3[,var1]~data3$Case, alternative = "two.sided")
+  a[i-16,c('p_value')] <- t$p.value
+  var <- colnames(data3)[i]
+  a[i-16,c('var')] <- colnames(data3)[i]
+  a[i-16, c('mean_7')] <- data4[1,var]
+  a[i-16,c("mean_8")] <- data4[2,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(p_value),]
+detach(a)
+print(newdata)
+#data <- order(data$p.value) 
+#print(data)
+#newdata <- newdata[1:91,]
+for(i in 17:109){
+  var1 <- newdata$var[i-16]
+  print(ggplot(data3, aes_string(x='Case', y=data3[,newdata$var[i-16]], fill='Case',group='Case'))+geom_boxplot()+ggtitle(newdata$var[i-16]))
+#  print(t.test(data3[,var1]~data3$Case))
+}
+```

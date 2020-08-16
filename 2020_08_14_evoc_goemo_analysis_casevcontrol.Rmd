@@ -18,16 +18,16 @@ unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
 
 # IDDay
 evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
-unblinding$IDDay <- paste(unbinding$participantID, unbinding$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
 
 # Join on ID Day
-data <- full_join(unbinding, evoc_trans, by="IDDay")
+data <- full_join(unblinding, evoc_trans, by="IDDay")
 # replace na's for 8 with pl
 data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
 # filter for only placebo
 data <- data %>% filter(drugCondition == "PL")
 # join to go emotions
-setwd("C:/Users/jakep/Desktop/ucsf")
+setwd("C:/Users/jakep/Desktop")
 goemo <- read.csv("go_emotions_output.csv")
 goemo$Filename <- substr(goemo$file, 17,50) # get filename
 goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
