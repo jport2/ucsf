@@ -72,6 +72,9 @@ attach(a)
 # sort by p
 newdata <- a[order(p_value),]
 detach(a)
+newdata$p_value <- round(newdata$p_value, digits=3)
+newdata$mean_ot <- round(newdata$mean_ot, digits=3)
+newdata$mean_pl <- round(newdata$mean_pl, digits=3)
 print(newdata)
 #data <- order(data$p.value) 
 #print(data)

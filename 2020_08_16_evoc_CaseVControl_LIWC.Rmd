@@ -27,6 +27,8 @@ data <- full_join(unblinding, evoc_trans, by="IDDay")
 data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
 # filter for only placebo
 data <- data %>% filter(drugCondition == "PL")
+# data <- data %>% filter(drugCondition == "OT")
+
 # set wd
 setwd("evocativeVideoTask")
 # read in liwc
@@ -64,7 +66,12 @@ attach(a)
 # sort by p
 newdata <- a[order(p_value),]
 detach(a)
-print(newdata)
+newdata$p_value <- round(newdata$p_value, digits=3)
+newdata$Cases <- round(newdata$mean_7, digits=3)
+newdata$Controls <- round(newdata$mean_8, digits=3)
+print(na.omit(newdata))
+# View(na.omit(newdata))
+
 #data <- order(data$p.value) 
 #print(data)
 #newdata <- newdata[1:91,]
@@ -73,4 +80,56 @@ for(i in 17:109){
   print(ggplot(data3, aes_string(x='Case', y=data3[,newdata$var[i-16]], fill='Case',group='Case'))+geom_boxplot()+ggtitle(newdata$var[i-16]))
 #  print(t.test(data3[,var1]~data3$Case))
 }
+```
+
+```{r}
+data4 <- data3[grep("joy",data3$Filename),]
+data_case <- data4 %>% filter(Case == 7)
+data_case <- data_case %>% group_by(participantID.x) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data_case$positive <- data_case$posemo
+
+data_case$negative <- data_case$negemo
+
+mean(data_case$positive, na.rm=TRUE)
+mean(data_case$negative, na.rm=TRUE)
+
+
+data4 <- data3[grep("neg",data3$Filename),]
+data_case <- data4 %>% filter(Case == 7)
+data_case <- data_case %>% group_by(participantID.x) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data_case$positive <- data_case$posemo
+
+data_case$negative <- data_case$negemo
+
+mean(data_case$positive, na.rm = TRUE)
+mean(data_case$negative, na.rm = TRUE)
+
+
+
+```
+
+```{r}
+data4 <- data3[grep("joy",data3$Filename),]
+data_case <- data4 %>% filter(Case == 8)
+data_case <- data_case %>% group_by(participantID.y) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data_case$positive <- data_case$posemo
+
+data_case$negative <- data_case$negemo
+
+mean(data_case$positive, na.rm=TRUE)
+mean(data_case$negative, na.rm=TRUE)
+
+
+data4 <- data3[grep("neg",data3$Filename),]
+data_case <- data4 %>% filter(Case == 8)
+data_case <- data_case %>% group_by(participantID.y) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data_case$positive <- data_case$posemo
+
+data_case$negative <- data_case$negemo
+
+mean(data_case$positive, na.rm = TRUE)
+mean(data_case$negative, na.rm = TRUE)
+
+
+
 ```

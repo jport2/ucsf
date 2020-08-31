@@ -40,6 +40,7 @@ data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
 
 emo_unblind <- right_join(goemo,data,by="Filename")
 emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
 ```
 
 ## T-test
@@ -64,6 +65,9 @@ attach(a)
 # sort by p
 newdata <- a[order(p_value),]
 detach(a)
+newdata$p_value <- round(newdata$p_value, digits=3)
+newdata$mean_7 <- round(newdata$mean_7, digits=3)
+newdata$mean_8 <- round(newdata$mean_8, digits=3)
 print(newdata)
 #data <- order(data$p.value) 
 #print(data)
@@ -75,3 +79,241 @@ for(i in 2:29){
 }
 ```
 
+```{r}
+data3 <- data2[grep("joy",data2$Filename),]
+data_case <- data3 %>% filter(Case == 7)
+data_case <- data_case %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+data_case$positive <- data_case$admiration + data_case$amusement + data_case$approval+
+  data_case$caring + data_case$desire + data_case$excitement + data_case$gratitude + data_case$joy +
+  data_case$love + data_case$optimism + data_case$pride + data_case$relief
+
+data_case$negative <- data_case$anger + data_case$annoyance + data_case$disappointment +         data_case$disapproval+data_case$disgust+data_case$embarrassment+data_case$fear+data_case$grief+
+  data_case$nervousness + data_case$remorse+data_case$sadness
+
+data_case$ambiguous <- data_case$confusion + data_case$curiosity + data_case$surprise + data_case$realization
+
+mean(data_case$positive)
+mean(data_case$negative)
+mean(data_case$neutral)
+mean(data_case$ambiguous)
+
+data3 <- data2[grep("neg",data2$Filename),]
+data_case <- data3 %>% filter(Case == 7)
+data_case <- data_case %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+data_case$positive <- data_case$admiration + data_case$amusement + data_case$approval+
+  data_case$caring + data_case$desire + data_case$excitement + data_case$gratitude + data_case$joy +
+  data_case$love + data_case$optimism + data_case$pride + data_case$relief
+
+data_case$negative <- data_case$anger + data_case$annoyance + data_case$disappointment +         data_case$disapproval+data_case$disgust+data_case$embarrassment+data_case$fear+data_case$grief+
+  data_case$nervousness + data_case$remorse+data_case$sadness
+
+data_case$ambiguous <- data_case$confusion + data_case$curiosity + data_case$surprise + data_case$realization
+
+mean(data_case$positive, na.rm = TRUE)
+mean(data_case$negative, na.rm = TRUE)
+mean(data_case$neutral, na.rm = TRUE)
+mean(data_case$ambiguous, na.rm = TRUE)
+
+data3 <- data2[grep("neu",data2$Filename),]
+data_case <- data3 %>% filter(Case == 7)
+data_case <- data_case %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+data_case$positive <- data_case$admiration + data_case$amusement + data_case$approval+
+  data_case$caring + data_case$desire + data_case$excitement + data_case$gratitude + data_case$joy +
+  data_case$love + data_case$optimism + data_case$pride + data_case$relief
+
+data_case$negative <- data_case$anger + data_case$annoyance + data_case$disappointment +         data_case$disapproval+data_case$disgust+data_case$embarrassment+data_case$fear+data_case$grief+
+  data_case$nervousness + data_case$remorse+data_case$sadness
+
+data_case$ambiguous <- data_case$confusion + data_case$curiosity + data_case$surprise + data_case$realization
+
+mean(data_case$positive)
+mean(data_case$negative)
+mean(data_case$neutral)
+mean(data_case$ambiguous)
+
+```
+
+```{r}
+data3 <- data2[grep("joy",data2$Filename),]
+data_pl <- data3 %>% filter(Case == 8)
+data_pl <- data_pl %>% group_by(participantID.y) %>% summarise_all(funs(mean))
+data_pl$positive <- data_pl$admiration + data_pl$amusement + data_pl$approval+
+  data_pl$caring + data_pl$desire + data_pl$excitement + data_pl$gratitude + data_pl$joy +
+  data_pl$love + data_pl$optimism + data_pl$pride + data_pl$relief
+
+data_pl$negative <- data_pl$anger + data_pl$annoyance + data_pl$disappointment +         data_pl$disapproval+data_pl$disgust+data_pl$embarrassment+data_pl$fear+data_pl$grief+
+  data_pl$nervousness + data_pl$remorse+data_pl$sadness
+
+data_pl$ambiguous <- data_pl$confusion + data_pl$curiosity + data_pl$surprise + data_pl$realization
+
+mean(data_pl$positive, na.rm = TRUE)
+mean(data_pl$negative, na.rm = TRUE)
+mean(data_pl$neutral, na.rm = TRUE)
+mean(data_pl$ambiguous, na.rm = TRUE)
+
+data3 <- data2[grep("neg",data2$Filename),]
+data_pl <- data3 %>% filter(Case == 8)
+data_pl <- data_pl %>% group_by(participantID.y) %>% summarise_all(funs(mean))
+data_pl$positive <- data_pl$admiration + data_pl$amusement + data_pl$approval+
+  data_pl$caring + data_pl$desire + data_pl$excitement + data_pl$gratitude + data_pl$joy +
+  data_pl$love + data_pl$optimism + data_pl$pride + data_pl$relief
+
+data_pl$negative <- data_pl$anger + data_pl$annoyance + data_pl$disappointment +         data_pl$disapproval+data_pl$disgust+data_pl$embarrassment+data_pl$fear+data_pl$grief+
+  data_pl$nervousness + data_pl$remorse+data_pl$sadness
+
+data_pl$ambiguous <- data_pl$confusion + data_pl$curiosity + data_pl$surprise + data_pl$realization
+
+mean(data_pl$positive, na.rm = TRUE)
+mean(data_pl$negative, na.rm = TRUE)
+mean(data_pl$neutral, na.rm = TRUE)
+mean(data_pl$ambiguous, na.rm = TRUE)
+
+data3 <- data2[grep("neu",data2$Filename),]
+data_pl <- data3 %>% filter(Case == 8)
+data_pl <- data_pl %>% group_by(participantID.y) %>% summarise_all(funs(mean))
+data_pl$positive <- data_pl$admiration + data_pl$amusement + data_pl$approval+
+  data_pl$caring + data_pl$desire + data_pl$excitement + data_pl$gratitude + data_pl$joy +
+  data_pl$love + data_pl$optimism + data_pl$pride + data_pl$relief
+
+data_pl$negative <- data_pl$anger + data_pl$annoyance + data_pl$disappointment +         data_pl$disapproval+data_pl$disgust+data_pl$embarrassment+data_pl$fear+data_pl$grief+
+  data_pl$nervousness + data_pl$remorse+data_pl$sadness
+
+data_pl$ambiguous <- data_pl$confusion + data_pl$curiosity + data_pl$surprise + data_pl$realization
+
+mean(data_pl$positive, na.rm=TRUE)
+mean(data_pl$negative, na.rm=TRUE)
+mean(data_pl$neutral, na.rm=TRUE)
+mean(data_pl$ambiguous, na.rm=TRUE)
+
+```
+
+```{r joy}
+data3 <- data2[grep("joy",data2$Filename),]
+data_case <- data_case %>% filter(Case == 7)
+data_oxy <- data_oxy %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+data_oxy$positive <- data_oxy$admiration + data_oxy$amusement + data_oxy$approval+
+  data_oxy$caring + data_oxy$desire + data_oxy$excitement + data_oxy$gratitude + data_oxy$joy +
+  data_oxy$love + data_oxy$optimism + data_oxy$pride + data_oxy$relief
+
+data_oxy$negative <- data_oxy$anger + data_oxy$annoyance + data_oxy$disappointment +         data_oxy$disapproval+data_oxy$disgust+data_oxy$embarrassment+data_oxy$fear+data_oxy$grief+
+  data_oxy$nervousness + data_oxy$remorse+data_oxy$sadness
+
+data_oxy$ambiguous <- data_oxy$confusion + data_oxy$curiosity + data_oxy$surprise + data_oxy$realization
+
+mean(data_oxy$positive)
+mean(data_oxy$negative)
+mean(data_oxy$neutral)
+mean(data_oxy$ambiguous)
+
+data3 <- data2[grep("joy",data2$Filename),]
+data_case <- data3 %>% filter(Case == 8)
+data_pl <- data_case %>% group_by(participantID.y) %>% summarise_all(funs(mean))
+data_pl$positive <- data_pl$admiration + data_pl$amusement + data_pl$approval+
+  data_pl$caring + data_pl$desire + data_pl$excitement + data_pl$gratitude + data_pl$joy +
+  data_pl$love + data_pl$optimism + data_pl$pride + data_pl$relief
+
+data_pl$negative <- data_pl$anger + data_pl$annoyance + data_pl$disappointment +         data_pl$disapproval+data_pl$disgust+data_pl$embarrassment+data_pl$fear+data_pl$grief+
+  data_pl$nervousness + data_pl$remorse+data_pl$sadness
+
+data_pl$ambiguous <- data_pl$confusion + data_pl$curiosity + data_pl$surprise + data_pl$realization
+
+mean(data_pl$positive)
+mean(data_pl$negative)
+mean(data_pl$neutral)
+mean(data_pl$ambiguous)
+a <- data.frame()
+t1 <- t.test(data_oxy$positive,data_pl$positive)
+t2 <- t.test(data_oxy$negative,data_pl$negative)
+t3 <-t.test(data_oxy$neutral,data_pl$neutral)
+t4 <- t.test(data_oxy$ambiguous,data_pl$ambiguous)
+a[1,c("positive")] <- t1$p.value
+a[1,c("negative")] <- t2$p.value
+a[1,c("neutral")] <- t3$p.value
+a[1,c("ambiguous")] <- t4$p.value
+
+# negative
+data3 <- data2[grep("neg",data2$Filename),]
+data_case <- data3 %>% filter(Case == 7)
+data_oxy <- data_case %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+data_oxy$positive <- data_oxy$admiration + data_oxy$amusement + data_oxy$approval+
+  data_oxy$caring + data_oxy$desire + data_oxy$excitement + data_oxy$gratitude + data_oxy$joy +
+  data_oxy$love + data_oxy$optimism + data_oxy$pride + data_oxy$relief
+
+data_oxy$negative <- data_oxy$anger + data_oxy$annoyance + data_oxy$disappointment +         data_oxy$disapproval+data_oxy$disgust+data_oxy$embarrassment+data_oxy$fear+data_oxy$grief+
+  data_oxy$nervousness + data_oxy$remorse+data_oxy$sadness
+
+data_oxy$ambiguous <- data_oxy$confusion + data_oxy$curiosity + data_oxy$surprise + data_oxy$realization
+
+mean(data_oxy$positive)
+mean(data_oxy$negative)
+mean(data_oxy$neutral)
+mean(data_oxy$ambiguous)
+
+data3 <- data2[grep("neg",data2$Filename),]
+data_case <- data3 %>% filter(Case == 8)
+data_pl <- data_case %>% group_by(participantID.y) %>% summarise_all(funs(mean))
+data_pl$positive <- data_pl$admiration + data_pl$amusement + data_pl$approval+
+  data_pl$caring + data_pl$desire + data_pl$excitement + data_pl$gratitude + data_pl$joy +
+  data_pl$love + data_pl$optimism + data_pl$pride + data_pl$relief
+
+data_pl$negative <- data_pl$anger + data_pl$annoyance + data_pl$disappointment +         data_pl$disapproval+data_pl$disgust+data_pl$embarrassment+data_pl$fear+data_pl$grief+
+  data_pl$nervousness + data_pl$remorse+data_pl$sadness
+
+data_pl$ambiguous <- data_pl$confusion + data_pl$curiosity + data_pl$surprise + data_pl$realization
+
+mean(data_pl$positive, na.rm = TRUE)
+mean(data_pl$negative, na.rm = TRUE)
+mean(data_pl$neutral, na.rm = TRUE)
+mean(data_pl$ambiguous, na.rm = TRUE)
+
+t1 <- t.test(data_oxy$positive,data_pl$positive)
+t2 <- t.test(data_oxy$negative,data_pl$negative)
+t3 <-t.test(data_oxy$neutral,data_pl$neutral)
+t4 <- t.test(data_oxy$ambiguous,data_pl$ambiguous)
+a[2,c("positive")] <- t1$p.value
+a[2,c("negative")] <- t2$p.value
+a[2,c("neutral")] <- t3$p.value
+a[2,c("ambiguous")] <- t4$p.value
+
+# neutral
+data3 <- data2[grep("neu",data2$Filename),]
+data_case <- data3 %>% filter(Case == 7)
+data_oxy <- data_case %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+data_oxy$positive <- data_oxy$admiration + data_oxy$amusement + data_oxy$approval+
+  data_oxy$caring + data_oxy$desire + data_oxy$excitement + data_oxy$gratitude + data_oxy$joy +
+  data_oxy$love + data_oxy$optimism + data_oxy$pride + data_oxy$relief
+
+data_oxy$negative <- data_oxy$anger + data_oxy$annoyance + data_oxy$disappointment +         data_oxy$disapproval+data_oxy$disgust+data_oxy$embarrassment+data_oxy$fear+data_oxy$grief+
+  data_oxy$nervousness + data_oxy$remorse+data_oxy$sadness
+
+data_oxy$ambiguous <- data_oxy$confusion + data_oxy$curiosity + data_oxy$surprise + data_oxy$realization
+
+mean(data_oxy$positive)
+mean(data_oxy$negative)
+mean(data_oxy$neutral)
+mean(data_oxy$ambiguous)
+data3 <- data2[grep("neu",data2$Filename),]
+data_case <- data3 %>% filter(Case == 8)
+data_pl <- data_case %>% group_by(participantID.y) %>% summarise_all(funs(mean))
+data_pl$positive <- data_pl$admiration + data_pl$amusement + data_pl$approval+
+  data_pl$caring + data_pl$desire + data_pl$excitement + data_pl$gratitude + data_pl$joy +
+  data_pl$love + data_pl$optimism + data_pl$pride + data_pl$relief
+
+data_pl$negative <- data_pl$anger + data_pl$annoyance + data_pl$disappointment +         data_pl$disapproval+data_pl$disgust+data_pl$embarrassment+data_pl$fear+data_pl$grief+
+  data_pl$nervousness + data_pl$remorse+data_pl$sadness
+
+data_pl$ambiguous <- data_pl$confusion + data_pl$curiosity + data_pl$surprise + data_pl$realization
+
+mean(data_pl$positive)
+mean(data_pl$negative)
+mean(data_pl$neutral)
+mean(data_pl$ambiguous)
+t1 <- t.test(data_oxy$positive,data_pl$positive)
+t2 <- t.test(data_oxy$negative,data_pl$negative)
+t3 <-t.test(data_oxy$neutral,data_pl$neutral)
+t4 <- t.test(data_oxy$ambiguous,data_pl$ambiguous)
+a[3,c("positive")] <- t1$p.value
+a[3,c("negative")] <- t2$p.value
+a[3,c("neutral")] <- t3$p.value
+a[3,c("ambiguous")] <- t4$p.value
+```

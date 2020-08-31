@@ -37,7 +37,7 @@ tom <- as.data.frame(tom)
 
 ## ToM w/ no Oxytocin Cases V Controls
 ```{r output}
-data <- tom %>% group_by(Case) %>% summarise_all(funs(mean))
+data <- tom %>% group_by(Case) %>% summarise_all(funs(mean(., na.rm = TRUE)))
 a <- data.frame()
 for(i in 6:98){
   var1 <- colnames(tom)[i]

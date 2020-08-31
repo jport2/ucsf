@@ -1,0 +1,89 @@
+---
+title: "2020_08_17_deusionsLIWC"
+author: "Jake Portanova"
+date: "August 17, 2020"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xlsx)
+library(dplyr)
+library(ggplot2)
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data <- data %>% filter(drugCondition == "PL")
+# set wd
+setwd("evocativeVideoTask")
+# read in liwc
+evoc <- read.csv("LIWC2015 Results (emotextfiles (1732 files)).csv")
+evoc$Filename <- as.character(evoc$Filename)
+evoc$id <- sapply(strsplit(evoc$Filename, "_"), "[", 1)
+evoc$emo <- sapply(strsplit(evoc$Filename, "_"), "[", 2)
+evoc$thing <- sapply(strsplit(evoc$Filename, "_"), "[", 3)
+evoc$IDstimulus <- paste(evoc$id,evoc$emo,evoc$thing, sep="_")
+
+data$IDstimulus <- paste(data$participantID.y,data$stimulus, sep="_")
+data2 <- data
+# make id stimulus variable
+data3 <- right_join(data2, evoc, by="IDstimulus")
+# bind data3 (liwc evoc) with demo
+setwd("C:/Users/jakep/Desktop")
+sz <- read.csv("PORQ_demographicAndBaselineDayData_labeled.csv")
+for(i in 62:221){
+  sz[,i] <- as.numeric(gsub("[^0-9.]", "",sz[,i]))
+}
+sz[,c("X")] <- as.numeric(gsub("[^0-9.]", "",sz[,"X"]))
+#colnames(sz[1]) <- "participantID.y"
+
+sz <- sz %>% rename(participantID.y = ï..Record.ID)
+data3$participantID.y <- as.factor(data3$participantID.y)
+data3 <- left_join(data3,sz,by="participantID.y")
+# make delusions a binary variable
+data3$Delusions <- ifelse(data3$X2..Delusions > 1 ,"Delusions","No Delusions")
+data3 <- data3[complete.cases(data3$Delusions),]
+```
+
+```{r output}
+data4 <- data3 %>% group_by(Delusions) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+a <- data.frame()
+for(i in 17:109){
+  var1 <- colnames(data3)[i]
+  t <- t.test(data3[,var1]~data3$Delusions, alternative = "two.sided")
+  a[i-16,c('p_value')] <- t$p.value
+  var <- colnames(data3)[i]
+  a[i-16,c('var')] <- colnames(data3)[i]
+  a[i-16, c('Delusions')] <- data4[1,var]
+  a[i-16,c("No Delusions")] <- data4[2,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(p_value),]
+detach(a)
+print(newdata)
+#data <- order(data$p.value) 
+#print(data)
+#newdata <- newdata[1:91,]
+# add X as size
+for(i in 17:109){
+  var1 <- newdata$var[i-16]
+  print(ggplot(data3, aes_string(x='Delusions', y=data3[,newdata$var[i-16]], fill='Delusions',group='Delusions'))+geom_boxplot()+ggtitle(newdata$var[i-16]))
+#  print(t.test(data3[,var1]~data3$Delusions))
+}
+```
