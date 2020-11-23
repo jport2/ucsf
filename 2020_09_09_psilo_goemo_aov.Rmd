@@ -1,0 +1,34 @@
+---
+title: "2020_09_09_psilo_goemo_aov"
+author: "Jake Portanova"
+date: "September 9, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+setwd("C:/Users/jakep/Desktop")
+goemo_psilo <- read.csv("go_emotions_output-psilocybin.csv")
+goemo_psilo_base <- goemo_psilo[grep("baseline",goemo_psilo$file),]
+goemo_psilo_base$day <- "baseline"
+goemo_psilo_day1 <- goemo_psilo[grep("day1",goemo_psilo$file),]
+goemo_psilo_day1$day <- "Day1"
+goemo_psilo_3 <- goemo_psilo[grep("3month",goemo_psilo$file),]
+goemo_psilo_3$day <- "3month"
+psilo <- rbind(goemo_psilo_base,goemo_psilo_day1,goemo_psilo_3)
+psilo$day <- factor(psilo$day, levels = c("baseline", "Day1", "3month"))
+```
+
+### Plot, Anova, Tukey
+
+```{r comparison, echo=FALSE}
+for(i in 2:29){
+  var <- colnames(psilo)[i]
+  print(ggplot(psilo, aes(x=day, y=psilo[,i], fill=day))+geom_boxplot()+
+    ggtitle(var))
+  a <- aov(psilo[,i]~psilo$day)
+  print(summary(a))
+  print(TukeyHSD(a))
+}
+```

@@ -1,0 +1,251 @@
+---
+title: "2020_09_05_ToM_ratings_cor2"
+author: "Jake Portanova"
+date: "September 9, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/geometricShapesTask")
+tom <- read.csv("LIWC2015_results_PORQ_geometricShapes_transcripts_nosource.csv")
+tom <- tom[1:762,]
+library(ggplot2)
+library(dplyr)
+library(xlsx)
+tom$Case <- substr(tom$Source..A.,1,1)
+tom$Case <- as.factor(tom$Case)
+tom$SourceC <- tom$Source..C.
+tom$SourceC <- as.factor(tom$SourceC)
+tom$SourceC <- gsub("[0-9.+]", "", tom$SourceC)
+# tom$SourceC <- factor(tom$SourceC, ,levels=c("random","goal","tom"))
+# tom <- tom[,c(1,2,6:99)]
+tom <- tom[complete.cases(tom),]
+tom$Case <- as.numeric(as.character(tom$Case))
+
+tom <- tom %>% rename(Day = Source..B.)
+tom$Day <- as.factor(tom$Day)
+tom <- tom %>% mutate(IDDay = paste(Source..A.,Day,sep="_"))
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW")
+drugunbind <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+drugunbind <- drugunbind %>% mutate(IDDay = paste(participantID,day,sep="_"))
+tom <- full_join(tom, drugunbind, by="IDDay")
+tom <- tom %>% rename(Oxytocin = drugCondition)
+tom <- tom %>% mutate_at(c('Oxytocin'), ~replace(., is.na(.), 'PL'))
+tom <- tom %>% filter(Oxytocin == 'PL')
+tom <- tom[complete.cases(tom$Case),]
+#tom <- tom %>% group_by(Source..A.) %>% summarise_all(funs(mean))
+tom <- as.data.frame(tom)
+
+setwd("C:/Users/jakep/Desktop")
+baseline <- read.csv("PORQ_demographicAndBaselineDayData_labeled.csv")
+ratings <- read.csv("PORQ_animatedShapes_ratings.csv")
+ratings$composite <- ratings$accuracy_rater1 +ratings$accuracy_rater2+ratings$intentionality_rater1+
+  ratings$intentionality_rater2
+ratings$intentionality <- ratings$intentionality_rater1 + ratings$intentionality_rater2
+ratings$accuracy <- ratings$accuracy_rater1 + ratings$accuracy_rater2
+tom$merge <- paste(tom$Source..A.,tom$Source..C.,tom$Source..D.,sep="_")
+ratings$merge <- paste(ratings[,1],ratings[,2],ratings[,3],sep = "_")
+liwc_ratings <- inner_join(tom,ratings, by="merge")
+
+```
+
+## Accuracy by SourceC
+```{r accuracy by condition, echo=FALSE, warning=FALSE}
+liwc_ratings2 <- liwc_ratings %>% filter(SourceC == "tom")
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings2)[i]
+  corr <- cor(liwc_ratings2$accuracy,liwc_ratings2[,var1], use="complete.obs", method=c("spearman"))
+  corr2 <- cor.test(liwc_ratings2$accuracy,liwc_ratings2[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('ToM')] <- corr
+  a[i-4,c("ToM-p")] <- corr2$p.value
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(-abs(ToM)),]
+detach(a)
+
+# goal
+liwc_ratings3 <- liwc_ratings %>% filter(SourceC == "goal")
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings3)[i]
+  corr <- cor(liwc_ratings3$accuracy,liwc_ratings3[,var1], use="complete.obs", method=c("spearman"))
+   corr2 <- cor.test(liwc_ratings3$accuracy,liwc_ratings3[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('goal')] <- corr
+    a[i-4,c("goal-p")] <- corr2$p.value
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata2 <- a[order(-abs(goal)),]
+detach(a)
+
+# random
+liwc_ratings4 <- liwc_ratings %>% filter(SourceC == "random")
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings4)[i]
+  corr <- cor(liwc_ratings4$accuracy,liwc_ratings4[,var1], use="complete.obs", method=c("spearman"))
+   corr2 <- cor.test(liwc_ratings4$accuracy,liwc_ratings4[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('random')] <- corr
+    a[i-4,c("random-p")] <- corr2$p.value
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata3 <- a[order(-abs(random)),]
+detach(a)
+newdata4 <- left_join(newdata, newdata2, by="var")
+newdata4 <- left_join(newdata4, newdata3, by="var")
+newdata4[,c(1,2,4:7)] <- round(newdata4[,-3],3)
+print(newdata4[,c("var","ToM","goal","random","ToM-p","goal-p","random-p")])
+```
+
+## intentionality by SourceC
+```{r intentionality by condition, echo=FALSE, warning=FALSE}
+liwc_ratings2 <- liwc_ratings %>% filter(SourceC == "tom")
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings2)[i]
+  corr <- cor(liwc_ratings2$intentionality,liwc_ratings2[,var1], use="complete.obs", method=c("spearman"))
+   corr2 <- cor.test(liwc_ratings2$intentionality,liwc_ratings2[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('ToM')] <- corr
+    a[i-4,c("ToM-p")] <- corr2$p.value
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(-abs(ToM)),]
+detach(a)
+
+# goal
+liwc_ratings3 <- liwc_ratings %>% filter(SourceC == "goal")
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings3)[i]
+  corr <- cor(liwc_ratings3$intentionality,liwc_ratings3[,var1], use="complete.obs", method=c("spearman"))
+   corr2 <- cor.test(liwc_ratings3$intentionality,liwc_ratings3[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('goal')] <- corr
+      a[i-4,c("goal-p")] <- corr2$p.value
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata2 <- a[order(-abs(goal)),]
+detach(a)
+
+# random
+liwc_ratings4 <- liwc_ratings %>% filter(SourceC == "random")
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings4)[i]
+  corr <- cor(liwc_ratings4$intentionality,liwc_ratings4[,var1], use="complete.obs", method=c("spearman"))
+   corr2 <- cor.test(liwc_ratings4$intentionality,liwc_ratings4[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('random')] <- corr
+  a[i-4,c("random-p")] <- corr2$p.value
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata3 <- a[order(-abs(random)),]
+detach(a)
+newdata4 <- left_join(newdata, newdata2, by="var")
+newdata4 <- left_join(newdata4, newdata3, by="var")
+newdata4[,c(1,2,4:7)] <- round(newdata4[,-3],3)
+print(newdata4[,c("var","ToM","goal","random","ToM-p","goal-p","random-p")])
+```
+
+## Accuracy 
+```{r accuracy, echo=FALSE}
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings)[i]
+  corr <- cor(liwc_ratings$accuracy,liwc_ratings[,var1], use="complete.obs",method=c("spearman"))
+  a[i-4,c('cor')] <- corr
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(-abs(cor)),]
+detach(a)
+print(newdata)
+```
+## Intentionality
+```{r intentionality, echo=FALSE}
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings)[i]
+  corr <- cor(liwc_ratings$intentionality,liwc_ratings[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('cor')] <- corr
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+  # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(-abs(cor)),]
+detach(a)
+print(newdata)
+```
+
+## Composite
+```{r, echo=FALSE}
+a <- data.frame()
+for(i in 5:97){
+  var1 <- colnames(liwc_ratings)[i]
+  corr <- cor(liwc_ratings$composite,liwc_ratings[,var1], use="complete.obs", method=c("spearman"))
+  a[i-4,c('cor')] <- corr
+  a[i-4,c("var")] <- colnames(liwc_ratings)[i]
+ # a[i-5,c('var')] <- colnames(tom)[i]
+  #a[i-5, c('diff')] <- data[2,var]-data[1,var]
+  #   library(broom)
+  #   library(dplyr)
+  # a <- liwc %>% group_by(Status) %>% do(tidy(t.test(liwc[i])))
+}
+attach(a)
+# sort by p
+newdata <- a[order(-abs(cor)),]
+detach(a)
+print(newdata)
+```

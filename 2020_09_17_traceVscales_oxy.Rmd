@@ -1,0 +1,225 @@
+---
+title: "2020_09_17_traceVscales_oxy"
+author: "Jake Portanova"
+date: "September 17, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Individual Trace Score
+library(xlsx)
+library(dplyr)
+library(ggplot2)
+library(wordspace)
+setwd("C:/Users/jakep/Desktop")
+baseline_scales <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+ratings <- read.csv("PORQ_animatedShapes_ratings.csv")
+ratings$composite <- ratings$accuracy_rater1 +ratings$accuracy_rater2+ratings$intentionality_rater1+
+  ratings$intentionality_rater2
+ratings$intentionality <- ratings$intentionality_rater1 + ratings$intentionality_rater2
+ratings$accuracy <- ratings$accuracy_rater1 + ratings$accuracy_rater2
+ratings$ID <- as.character(ratings[,1])
+baseline_scales$ID <- as.character(baseline_scales[,2])
+ratings_scales <- inner_join(ratings, baseline_scales, by="ID")
+ratings_scales$Case <- as.factor(substr(ratings_scales$ID,1,1))
+ratings_scales$condition <- gsub("[0-9.+]", "", ratings_scales$stimulus)
+#
+library(xlsx)
+library(dplyr)
+library(ggplot2)
+library(wordspace)
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data$Case <- substr(data$participantID.y,1,1)
+data <- data %>% filter(Case == "7")
+# join to go emotions
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+emo_unblind$emo <- gsub(" neg","neg",emo_unblind$emo)
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+  emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+  emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief
+
+emo_unblind$negative <- emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+emo_unblind$fear+emo_unblind$grief+
+  emo_unblind$nervousness + emo_unblind$remorse+emo_unblind$sadness
+
+#data4 <- emo_unblind %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+emo_unblind2 <- emo_unblind %>% filter(drugCondition == "OT")
+data5 <- emo_unblind2 %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data6 <- data5 %>% filter(emo == "joy")
+data7 <- data5 %>% filter(emo=="neg")
+data67 <- inner_join(data6, data7, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data678 <- inner_join(data67, data8, by="id")
+data678$trace <- data678$positive.x + data678$negative.y + data678$neutral
+data678$Case <- substr(data678$id,1,1)
+
+emo_unblind3 <- emo_unblind %>% filter(drugCondition == "PL")
+data5 <- emo_unblind3 %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data6 <- data5 %>% filter(emo == "joy")
+data7 <- data5 %>% filter(emo=="neg")
+data67 <- inner_join(data6, data7, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data789 <- inner_join(data67, data8, by="id")
+data789$trace <- data789$positive.x + data789$negative.y + data789$neutral
+data789$Case <- substr(data789$id,1,1)
+
+
+data678$drugCondition <- "OT"
+data789$drugCondition <- "PL"
+
+data678 <- rbind(data678,data789)
+
+data678 <- data678 %>% rename(ID = id)
+ratings_scales$Dose <- ratings_scales$X
+
+ratings_scales$ECRRS_romantic_avoidance <- (8-ratings_scales$It.helps.to.turn.to.this.person.in.times.of.need..R..3)+
+  (8-ratings_scales$I.usually.discuss.my.problems.and.concerns.with.this.person..R..3) +
+  (8-ratings_scales$I.talk.things.over.with.this.person..R..3) +
+  (8-ratings_scales$I.find.it.easy.to.depend.on.this.person..R..3)
+
+ratings_scales$ECRRS_romantic_anxiety <-
+ratings_scales$I.don.t.feel.comfortable.opening.up.to.this.person.3 +
+ratings_scales$I.prefer.not.to.show.this.person.how.I.feel.deep.down..3 +
+ratings_scales$I.often.worry.that.this.person.doesn.t.really.care.for.me.3+
+ratings_scales$I.m.afraid.that.this.person.may.abandon.me.3 +
+ratings_scales$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.3
+
+scales_trace <- inner_join(data678,ratings_scales, by="ID")
+scales_trace <- unique( scales_trace[ , c("ID","drugCondition","Dose","trace","ECRRS_romantic_avoidance","ECRRS_romantic_anxiety","QLS",
+                                          "AMNART","CAINS",                                                                                             
+                                           "PANSSpos" ,                                                                                         
+                                           "PANSSneg"  ,                                                                                        
+                                          "PANSSdisorganization"  ,                                                                            
+                                           "RFS"                    ,                                                                           
+                                           "Hinting"                 ,                                                                          
+                                          "Defeatist"                ,                                                                         
+                                           "ECRRSmom"                  ,                                                                        
+                                           "ECRRSdad"                   ,                                                                       
+                                           "ECRRSromantic"               ,                                                                      
+                                          "ECRRSfriend"                  ,                                                                     
+                                           "ECRRS",
+                                          "Diagnosis..choice.Schizophrenia.",
+                                          "Diagnosis..choice.Schizoaffective.Disorder.")]) 
+scales_trace$Case <- substr(scales_trace$ID,1,1)
+scales_trace$Diagnosis <- NA
+scales_trace[scales_trace$Diagnosis..choice.Schizophrenia.=="Checked"&&
+               scales_trace$Diagnosis..choice.Schizophrenia.=="Checked",c("Diagnosis")] <- "Neither"
+scales_trace[scales_trace$Diagnosis..choice.Schizophrenia.=="Checked",c("Diagnosis")] <- "Schizophrenia"
+scales_trace[scales_trace$Diagnosis..choice.Schizoaffective.Disorder.=="Checked",c("Diagnosis")] <- "Schizoaffective"
+```
+```{r plots, echo=FALSE,warning=FALSE}
+ggplot(scales_trace, aes(y=trace,x=CAINS,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Negative Symptoms and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+
+ggplot(scales_trace, aes(y=trace,x=PANSSpos,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Positive Symptoms and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+
+ggplot(scales_trace, aes(y=trace,x=PANSSneg,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Negative Symptoms and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+
+ggplot(scales_trace, aes(y=trace,x=PANSSdisorganization,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Disorganization and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+
+ggplot(scales_trace, aes(y=trace,x=RFS,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Role Functioning and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+
+ggplot(scales_trace, aes(y=trace,x=QLS,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Quality of Life and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+
+ggplot(scales_trace, aes(y=trace,x=Defeatist,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Defeatist Beliefs and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=Hinting,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between Hinting Scale and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=AMNART,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between AMNART and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=ECRRS,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(method=lm)+ggtitle("Relationship between ECRRS and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=ECRRSmom,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(aes(group = Case),method=lm)+ggtitle("Relationship between Negative Symptoms and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=ECRRSdad,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(aes(group = Case),method=lm)+ggtitle("Relationship between Negative Symptoms and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=ECRRS_romantic_anxiety,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(aes(group = Case),method=lm)+ggtitle("Relationship between Anxiety in Romantic Relationship and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=ECRRS_romantic_avoidance,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(aes(group = Case),method=lm)+ggtitle("Relationship between Avoidance in Romantic Relationships and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+library(tidyr)
+datanew <- scales_trace[,c("trace","Case","drugCondition","ECRRS_romantic_anxiety","ECRRS_romantic_avoidance")]
+spread()
+ggplot(scales_trace, aes(y=ECRRS_romantic_anxiety,x=ECRRS_romantic_avoidance,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=trace))+geom_smooth(aes(group = Case),method=lm)+ggtitle("Avoidance/Anxiety in Romantic Relationships and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+ggplot(scales_trace, aes(y=trace,x=ECRRSfriend,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=Dose, shape=Diagnosis))+geom_smooth(aes(group = Case),method=lm)+ggtitle("Relationship between Negative Symptoms and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))
+cor(scales_trace[,c("trace","QLS","AMNART","CAINS",                                                                                             
+                                           "PANSSpos" ,                                                                                         
+                                           "PANSSneg"  ,                                                                                        
+                                          "PANSSdisorganization"  ,                                                                            
+                                           "RFS"                    ,                                                                           
+                                           "Hinting"                 ,                                                                          
+                                          "Defeatist"                ,                                                                         
+                                           "ECRRSmom"                  ,                                                                        
+                                           "ECRRSdad"                   ,                                                                       
+                                           "ECRRSromantic"               ,                                                                      
+                                          "ECRRSfriend"                  ,                                                                     
+                                           "ECRRS")], use="complete.obs")
+scales_trace %>% group_by(Diagnosis,drugCondition) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+```
+
+```{r nextime,echo=F,warning=F}
+ggplot(scales_trace,aes(y=PANSSpos,x=RFS))+geom_point(aes(size=CAINS, shape=Diagnosis))+geom_smooth()+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+ggtitle("Positive Symptoms v Functioning with CAINS")
+
+ggplot(scales_trace,aes(y=CAINS,x=RFS))+geom_point(aes(size=PANSSpos, shape=Diagnosis))+geom_smooth()+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+ggtitle("Negative Symptoms v Functioning with Positive Symptoms")
+
+
+ggplot(scales_trace, aes(y=CAINS,x=PANSSpos,color=drugCondition))+geom_point()+geom_smooth(method=lm)+geom_point(aes(size=trace, shape=Diagnosis))+geom_smooth(aes(group = Case),method=lm)+ggtitle("Relationship between Negative Symptoms and Trace")+
+  ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")+
+  scale_color_manual(values=c("darkorange","#F8766D"))

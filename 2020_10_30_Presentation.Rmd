@@ -1,0 +1,332 @@
+---
+title: "2020/10/30 Presentation"
+author: "Jake Portanova"
+date: "October 29, 2020"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(xlsx)
+library(wordspace)
+library(ROCR)
+setwd("C:/Users/jakep/Desktop")
+demo <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data <- data %>% filter(drugCondition == "PL")
+data$file <- paste(data$participantID.y,data$stimulus,sep="_")
+setwd("C:/Users/jakep/Desktop")
+coherence <- read.csv("coherenceresult.csv")
+coherencepl <- left_join(coherence, data, by="file")
+coherencepl$id <- substr(coherencepl$file,1,4)
+coherenceplr <- coherencepl %>% group_by(id) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+cohdemo <- inner_join(coherenceplr,demo,by="id")
+cohdemo$LackOfSpontaneityFlowOfConverstation <- cohdemo$X8..Lack.of.Spontaneity.Flow.of.Conversation   
+cohdemo$ConceptualDisorganization <- cohdemo$X13..Conceptual.Disorganization
+cohdemo$IncoherentSpeech <- cohdemo$X14..Incoherent.Speech                                        
+cohdemo$PovertyOfSpeechContent <- cohdemo$X15..Poverty.of.Speech.Content 
+
+## T-test and ROC GoEmo Processing
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+#goemo <- goemo[-which(goemo$thing=="heart"),]
+goemo$feeldescribe <- sapply(strsplit(goemo$Filename, "_"), "[", 4)
+goemo <- goemo[grep("feel",goemo$feeldescribe),]
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
+
+emo_unblind2 <- emo_unblind[,c("positive","negative")]
+data_raw <- emo_unblind %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative","neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+emo_unblind_norm[,"pos_max"] <- apply(emo_unblind_norm[,c("admiration", "amusement","approval",
+                           "caring", "desire", "excitement", "gratitude", 
+                           "joy", "love","optimism", "pride", "relief")],1,max)
+emo_unblind_norm[,"neg_max"] <- apply(emo_unblind_norm[,c("anger", "annoyance", "disappointment", "disapproval","disgust","embarrassment","fear","grief","nervousness", "remorse","sadness")],1,max)
+data5 <- emo_unblind_norm %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data5$Case <- as.factor(substr(data5$id,1,1))
+
+setwd("C:/Users/jakep/Dropbox/jakeLIWCanalyes")
+library(xlsx)
+library(irr)
+stimuliRatings <- read.xlsx("evocativeVideoTask_stimuliRatings_2020-10-21.xlsx", sheetIndex = 1)
+mydata <- select(stimuliRatings, contains("valence"))
+mydata[mydata == ""] <- NA
+mydata <- mydata[-c(1,2),]
+mydata <- mydata[1:23,]
+mydata <- mydata %>% select(matches("baby|dog|grandpa|phone|heart|bugear|lightsout|nuts|dying|coffe|larva|broken"))
+```
+
+## Presentation Outline
+
+- Summary Statistics on Video Choosing
+- PANSS and Coherence
+- T-tests/ROC Curves
+
+
+## Light's Kappa
+
+```{r light}
+mydata2 <- mydata[complete.cases(mydata),]
+kappam.light(t(mydata2))
+```
+
+## Positive Video Analysis
+
+```{r pos}
+mydata2 <- mydata %>% select(matches("baby|dog|grandpa|phone"))
+for(i in colnames(mydata2)){
+  mydata2[,i] <- as.numeric(mydata2[,i])
+}
+colnames(mydata2) <- sapply(strsplit(colnames(mydata2), "_"), "[", 1)
+tab <- mydata2 %>% summarise_all(funs(mean(., na.rm = TRUE)))
+tab2 <- mydata2 %>% summarise_all(funs(sd))
+rbind(tab,tab2)
+```
+
+## Negative Video Analysis
+
+```{r neg}
+mydata2 <- mydata %>% select(matches("heart|bugear|lightsout|nuts|dying|coffe|larva|broken"))
+for(i in colnames(mydata2)){
+  mydata2[,i] <- as.numeric(mydata2[,i])
+}
+colnames(mydata2) <- sapply(strsplit(colnames(mydata2), "_"), "[", 1)
+tab <- mydata2 %>% summarise_all(funs(mean))
+tab2 <- mydata2 %>% summarise_all(funs(sd))
+rbind(tab,tab2)
+```
+
+
+## Incoherent Speech V Sentence Mean
+
+```{r incoh, echo = FALSE, warning=FALSE}
+ggplot(cohdemo, aes(x=IncoherentSpeech, y=sentmean))+geom_point()+ggtitle("Incoherent Speech Versus Sentence Mean")
+```
+
+## Conceptual Disorganization V Sentence Mean
+
+```{r dis, warning=FALSE}
+ggplot(cohdemo, aes(x=ConceptualDisorganization, y=sentmean))+geom_point()+ggtitle("Conceptual Disorganization Versus Sentence Mean")
+```
+
+## Poverty of Speech V Sentence Mean
+
+```{r pov, echo = FALSE, warning=FALSE}
+ggplot(cohdemo, aes(x=PovertyOfSpeechContent, y=sentmean))+geom_point()+ggtitle("Poverty of Speech Content Versus Sentence Mean")
+```
+
+## Lack of Spontaneity V Sentence Mean
+
+```{r spont, warning=FALSE}
+ggplot(cohdemo, aes(x=LackOfSpontaneityFlowOfConverstation, y=sentmean))+geom_point()+ggtitle("Lack Of Spontaneity Flow Of Converstation Versus Sentence Mean")
+```
+
+## Slide with Pos Align t-test
+
+```{r pos t}
+data_joy <- data5 %>% filter(emo == "joy")
+t <- t.test(positive~Case, data=data_joy)
+print(t)
+```
+
+## Slide with Pos max align t-test
+```{r pos max t}
+data6 <- data5 %>% filter(emo == "joy")
+# data6[,"pos_max"] <- apply(data6[,c("admiration", "amusement","approval",
+#                            "caring", "desire", "excitement", "gratitude", 
+#                            "joy", "love","optimism", "pride", "relief")],1,max)
+# data6[,"neg_max"] <- apply(data6[,c("anger", "annoyance", "disappointment", "disapproval","disgust","embarrassment","fear","grief","nervousness", "remorse","sadness")],1,max)
+data6_r <- data6[,c("pos_max","neg_max")]
+data6_r <- normalize.rows(as.matrix(data6_r),method="manhattan")
+data6 <- data6[ , -which(names(data6) %in% c("pos_max","neg_max"))]
+data6_r <- as.data.frame(data6_r)
+data6_r2 <- cbind(data6,data6_r)
+t2 <- t.test(pos_max~Case, data=data6_r2)
+print(t2)
+```
+
+## Raw Positive
+```{r raw pos}
+data_raw$Case <- substr(data_raw$id,1,1)
+data_raw$Case <- as.factor(data_raw$Case)
+data_raw <- data_raw[complete.cases(data_raw$Case),]
+data_raw2 <- data_raw %>% filter(emo=="joy")
+t3 <- t.test(positive~Case, data=data_raw2)
+print(t3)
+```
+
+## ROC with Raw and Normalized Pos and Neg Alignment
+
+```{r single align roc}
+pred <- prediction( data_joy$positive, data6_r2$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="black")
+text(.8,0.05,labels=paste("Pos_norm_AUC =",text,sep=" "), cex=0.75)
+pred <- prediction( data_joy$negative, data6_r2$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="gray", add=TRUE)
+text(.8,0,labels=paste("Neg_norm_AUC =",text,sep=" "), cex=0.75)
+
+#text(1,0.2,labels=paste("Pos_AUC =",text,sep=" "), cex=0.75)
+pred <- prediction( data6_r2$pos_max, data6_r2$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="red", add=TRUE)
+text(.8,0.25,labels=paste("PosMax_AUC =",text,sep=" "), cex=0.75)
+
+pred <- prediction( data6_r2$neg_max, data6_r2$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="orange", add=TRUE)
+text(.8,0.2,labels=paste("NegMax_AUC =",text,sep=" "), cex=0.75)
+
+pred <- prediction( data_raw2$positive, data_raw2$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="blue", add=TRUE)
+text(.8,0.15,labels=paste("Pos_AUC =",text,sep=" "), cex=0.75)
+
+pred <- prediction( data_raw2$negative, data_raw2$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="purple", add=TRUE)
+text(.8,0.10,labels=paste("Neg_AUC =",text,sep=" "), cex=0.75)
+legend("right", c("Pos_Norm", "Neg_Norm","Pos_Max","NegMax","Raw_Pos","Raw_Neg"), lty=1, 
+    col = c("black","gray","red","orange","blue","purple"), bty="n", inset=c(0,-0.15))
+```
+
+## Slide with Trace T-test
+
+```{r trace}
+data6 <- data5 %>% filter(emo == "joy")
+data6_r <- data6[,c("positive","negative")]
+data6_r <- normalize.rows(as.matrix(data6_r),method="manhattan")
+data6 <- data6[ , -which(names(data6) %in% c("positive","negative"))]
+data6_r <- as.data.frame(data6_r)
+data6_r2 <- cbind(data6,data6_r)
+data7 <- data5 %>% filter(emo=="neg")
+data7_r <- data7[,c("positive","negative")]
+data7_r <- normalize.rows(as.matrix(data7_r),method="manhattan")
+data7 <- data7[ , -which(names(data7) %in% c("positive","negative"))]
+data7_r <- as.data.frame(data7_r)
+data7_r2 <- cbind(data7,data7_r)
+data67 <- inner_join(data6_r2, data7_r2, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data678 <- inner_join(data67, data8, by="id")
+data678$trace <- data678$positive.x + data678$negative.y 
+t3 <- t.test(trace~Case, data=data678)
+print(t3)
+```
+
+## Slide with Trace Max T-test
+
+```{r trace max}
+data6 <- data5 %>% filter(emo == "joy")
+# data6[,"pos_max"] <- apply(data6[,c("admiration", "amusement","approval",
+#                            "caring", "desire", "excitement", "gratitude", 
+#                            "joy", "love","optimism", "pride", "relief")],1,max)
+# data6[,"neg_max"] <- apply(data6[,c("anger", "annoyance", "disappointment", "disapproval","disgust","embarrassment","fear","grief","nervousness", "remorse","sadness")],1,max)
+data6_r <- data6[,c("pos_max","neg_max")]
+data6_r <- normalize.rows(as.matrix(data6_r),method="manhattan")
+data6 <- data6[ , -which(names(data6) %in% c("pos_max","neg_max"))]
+data6_r <- as.data.frame(data6_r)
+data6_r2 <- cbind(data6,data6_r)
+
+data7 <- data5 %>% filter(emo=="neg")
+# data7[,"pos_max"] <- apply(data7[,c("admiration", "amusement","approval",
+#                            "caring", "desire", "excitement", "gratitude", 
+#                            "joy", "love","optimism", "pride", "relief")],1,max)
+# data7[,"neg_max"] <- apply(data7[,c("anger", "annoyance", "disappointment", "disapproval","disgust","embarrassment","fear","grief","nervousness", "remorse","sadness")],1,max)
+data7_r <- data7[,c("pos_max","neg_max")]
+data7_r <- normalize.rows(as.matrix(data7_r),method="manhattan")
+data7 <- data7[ , -which(names(data7) %in% c("pos_max","neg_max"))]
+data7_r <- as.data.frame(data7_r)
+data7_r2 <- cbind(data7,data7_r)
+
+data67 <- inner_join(data6_r2, data7_r2, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data679 <- inner_join(data67, data8, by="id")
+data679$trace_max <- data679$pos_max.x + data679$neg_max.y 
+t4 <- t.test(trace_max~Case, data=data679)
+print(t4)
+```
+
+## Raw Trace T-Test
+
+```{r raw trace}
+data6 <- data_raw %>% filter(emo == "joy")
+data7 <- data_raw %>% filter(emo=="neg")
+data67 <- inner_join(data6, data7, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data6710 <- inner_join(data67, data8, by="id")
+data6710$trace <- data6710$positive.x + data6710$negative.y 
+tt <- t.test(trace~Case, data=data6710)
+print(tt)
+```
+
+## ROC with Raw and Normalized Trace
+
+```{r trace roc}
+pred <- prediction( data678$trace, data678$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="red")
+text(.9,0.35,labels=paste("Trace_norm_AUC =",text,sep=" "), cex=0.75)
+
+
+pred <- prediction( data679$trace_max, data679$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="blue", add=TRUE)
+text(.9,0.3,labels=paste("TraceMax_AUC =",text,sep=" "), cex=0.75)
+
+pred <- prediction( data6710$trace, data6710$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="green", add=TRUE)
+text(.9,0.25,labels=paste("RawTrace_AUC =",text,sep=" "), cex=0.75)
+legend("right", c("Trace_Norm", "Trace_Max","Raw_Trace"), lty=1, 
+    col = c("red", "blue","green"), bty="n", inset=c(0,-0.15))
+```
+

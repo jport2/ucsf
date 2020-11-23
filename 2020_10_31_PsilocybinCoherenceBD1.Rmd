@@ -1,0 +1,82 @@
+---
+title: "Psilocybin Coherence"
+author: "Jake Portanova"
+date: "October 31, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ROCR)
+setwd("C:/Users/jakep/Desktop")
+baseline <- read.csv("coherenceresult_baseline.csv")
+day1 <- read.csv("coherenceresult_day1.csv")
+month <- read.csv("coherencerestuls_3month.csv")
+#baseline$id <- substr(baseline$file,7,8)
+day1$id <- substr(day1$file,7,8)
+#month$id <- substr(month$file,7,8)
+bd1 <- full_join(baseline,day1,by="id")
+bd1 <- bd1[!duplicated(bd1$file.x),]
+bd1 <- bd1[-c(1),]
+bd12 <- rbind(baseline, day1)
+bd123 <- rbind(bd12, month)
+bd12 <- bd12[1:23,]
+bd12 <- bd12[bd12$id %in% bd12$id[duplicated(bd12$id)],]
+bd12$Day <- substr(bd12$file,10,13)
+bd123$Day <- substr(bd123$file, 10, 13)
+```
+
+## R Markdown
+
+```{r paired t}
+for(i in 3:14){
+  var1 <- colnames(bd1)[i]
+  var2 <- colnames(bd1)[i+38]
+  t <- t.test(bd1[,var1],as.numeric(bd1[,var2]))
+  print(var1)
+  print(t)
+  # t <- t.test(var1~Day, data=bd12,paired=TRUE)
+  # g <- ggplot(bd12, aes(x=Day, y=var1))+geom_boxplot()
+  # print(g)
+  # print(t)
+}
+for(i in 15:37){
+  var1 <- colnames(bd1)[i]
+  var2 <- colnames(bd1)[i+29]
+  t <- t.test(bd1[,var1],as.numeric(bd1[,var2]))
+  print(var1)
+  print(t)
+  # t <- t.test(var1~Day, data=bd12,paired=TRUE)
+  # g <- ggplot(bd12, aes(x=Day, y=var1))+geom_boxplot()
+  # print(g)
+  # print(t)
+}
+```
+
+```{r roc}
+bd12$Day <- as.factor(bd12$Day)
+for(i in 3:37){
+  var <- colnames(bd12)[i]
+  bd12[,var] <- as.numeric(bd12[,var])
+  bd12 <- bd12[complete.cases(bd12[,var]),]
+  pred <- prediction( bd12[,var], bd12$Day)
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+print(var)
+plot( perf, col="black")
+text(.8,0.05,labels=paste("AUC =",text,sep=" "), cex=0.75)
+}
+```
+
+```{r tukey aov}
+psilo <- bd123
+for(i in 2:29){
+  var <- colnames(psilo)[i]
+  print(ggplot(psilo, aes(x=day, y=psilo[,i], fill=day))+geom_boxplot()+
+    ggtitle(var))
+  a <- aov(psilo[,i]~psilo$day)
+  print(summary(a))
+  print(TukeyHSD(a))
+}
+}

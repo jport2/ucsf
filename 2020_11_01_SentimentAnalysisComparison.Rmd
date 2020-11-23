@@ -1,0 +1,276 @@
+---
+title: "LIWC/GoEmo Results"
+author: "Jake Portanova"
+date: "November 1, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xlsx)
+library(dplyr)
+library(ggplot2)
+library(wordspace)
+library(ROCR)
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+#data$drugCondition <- factor(data$drugCondition, levels = c("PL","OT","HC"))
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+#data <- data %>% filter(drugCondition == "PL")
+# join to go emotions
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+goemo$feeldescribe <- sapply(strsplit(goemo$Filename, "_"), "[", 4)
+goemo <- goemo[grep("feel",goemo$feeldescribe),] # change to describe later
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
+
+emo_unblind2 <- emo_unblind[,c("positive","negative","neutral")]
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative", "neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+
+#data4 <- emo_unblind_norm %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+#emo_unblind_norm$Video <- paste(emo_unblind_norm$emo, emo_unblind_norm$thing, sep="_")
+data5 <- emo_unblind_norm %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data5$Case <- substr(data5$id,1,1)
+
+# Trace
+data6 <- data5 %>% filter(emo == "joy")
+data6_r <- data6[,c("positive","negative")]
+data6_r <- normalize.rows(as.matrix(data6_r),method="manhattan")
+data6 <- data6[ , -which(names(data6) %in% c("positive","negative"))]
+data6_r <- as.data.frame(data6_r)
+data6_r2 <- cbind(data6,data6_r)
+data7 <- data5 %>% filter(emo=="neg")
+data7_r <- data7[,c("positive","negative")]
+data7_r <- normalize.rows(as.matrix(data7_r),method="manhattan")
+data7 <- data7[ , -which(names(data7) %in% c("positive","negative"))]
+data7_r <- as.data.frame(data7_r)
+data7_r2 <- cbind(data7,data7_r)
+data67 <- inner_join(data6_r2, data7_r2, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data678 <- inner_join(data67, data8, by="id")
+data678$trace <- data678$positive.x + data678$negative.y 
+
+# join to go emotions
+setwd("C:/Users/jakep/Desktop")
+ekman <- read.csv("go_emotions_output-ekman.csv")
+ekman$Filename <- substr(ekman$file, 17,50) # get filename
+ekman$id <- sapply(strsplit(ekman$Filename, "_"), "[", 1)
+ekman$emo <- sapply(strsplit(ekman$Filename, "_"), "[", 2)
+ekman$thing <- sapply(strsplit(ekman$Filename, "_"), "[", 3)
+ekman <- ekman[-which(ekman$thing=="heart"),]
+ekman$feeldescribe <- sapply(strsplit(ekman$Filename, "_"), "[", 4)
+ekman <- ekman[grep("feel",ekman$feeldescribe),]
+ekman$Filename <- paste(ekman$id,ekman$emo,ekman$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(ekman,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- emo_unblind$joy
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$disgust + emo_unblind$fear +
+  emo_unblind$sadness)/4
+
+emo_unblind2 <- emo_unblind[,c("positive","negative", "neutral")]
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative", "neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+
+#data4 <- emo_unblind_norm %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+emo_unblind_norm$Video <- paste(emo_unblind_norm$emo, emo_unblind_norm$thing, sep="_")
+data_ek <- emo_unblind_norm %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data_ek$Case <- substr(data_ek$id,1,1)
+
+data1 <- data_ek %>% filter(emo == "joy")
+data1_r <- data1[,c("positive","negative")]
+data1_r <- normalize.rows(as.matrix(data1_r),method="manhattan")
+data1 <- data1[ , -which(names(data1) %in% c("positive","negative"))]
+data1_r <- as.data.frame(data1_r)
+data1_r2 <- cbind(data1,data1_r)
+data2 <- data_ek %>% filter(emo=="neg")
+data2_r <- data2[,c("positive","negative")]
+data2_r <- normalize.rows(as.matrix(data2_r),method="manhattan")
+data2 <- data2[ , -which(names(data2) %in% c("positive","negative"))]
+data2_r <- as.data.frame(data2_r)
+data2_r2 <- cbind(data2,data2_r)
+data12 <- inner_join(data1_r2, data2_r2, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data128 <- inner_join(data12, data8, by="id")
+data128$trace <- data128$positive.x + data128$negative.y
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data <- data %>% filter(drugCondition == "PL")
+# data <- data %>% filter(drugCondition == "OT")
+
+# set wd
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+# read in liwc
+evoc <- read.csv("LIWC2015 Results (emotextfiles (1732 files)).csv")
+evoc$Filename <- as.character(evoc$Filename)
+evoc$id <- sapply(strsplit(evoc$Filename, "_"), "[", 1)
+evoc$emo <- sapply(strsplit(evoc$Filename, "_"), "[", 2)
+evoc$thing <- sapply(strsplit(evoc$Filename, "_"), "[", 3)
+evoc <- evoc[-which(evoc$thing=="heart"),]
+evoc$feeldescribe <- sapply(strsplit(evoc$Filename, "_"), "[", 4)
+evoc <- evoc[grep("feel",evoc$feeldescribe),]
+evoc$IDstimulus <- paste(evoc$id,evoc$emo,evoc$thing, sep="_")
+
+data$IDstimulus <- paste(data$participantID.y,data$stimulus, sep="_")
+data2 <- data
+# make id stimulus variable
+data3 <- right_join(data2, evoc, by="IDstimulus")
+# merge liwc with 
+data3$Case <- substr(data3$participantID.y,1,1)
+data3 <- data3 %>% filter(drugCondition == "PL")
+emo_unblind <- data3
+emo_unblind2 <- emo_unblind[,c("posemo","negemo")]
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("posemo","negemo"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+
+#data4 <- emo_unblind_norm %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+data_liwc <- emo_unblind_norm %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data_liwc$Case <- substr(data_liwc$id, 1,1)
+
+# Trace
+data6liwc <- data_liwc %>% filter(emo == "joy")
+data6liwc_r <- data6liwc[,c("posemo","negemo")]
+data6liwc_r <- normalize.rows(as.matrix(data6liwc_r),method="manhattan")
+data6_liwc_pos <- data6liwc
+data6liwc <- data6liwc[ , -which(names(data6liwc) %in% c("posemo","negemo"))]
+data6liwc_r <- as.data.frame(data6liwc_r)
+data6liwc_r2 <- cbind(data6liwc,data6liwc_r)
+data7liwc <- data_liwc %>% filter(emo=="neg")
+data7liwc_r <- data7liwc[,c("posemo","negemo")]
+data7liwc_r <- normalize.rows(as.matrix(data7liwc_r),method="manhattan")
+data7liwc <- data7liwc[ , -which(names(data7liwc) %in% c("posemo","negemo"))]
+data7liwc_r <- as.data.frame(data7liwc_r)
+data7liwc_r2 <- cbind(data7liwc,data7liwc_r)
+data6liwc7 <- inner_join(data6liwc_r2, data7liwc_r2, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data6liwc78 <- inner_join(data6liwc7, data8, by="id")
+data6liwc78$trace <- data6liwc78$posemo.x + data6liwc78$negemo.y
+```
+
+
+```{r ttest trace}
+print("goemo")
+t.test(trace~Case, data=data678)
+print("ekman")
+t.test(trace~Case, data = data128)
+print("liwc")
+t.test(trace~Case, data=data6liwc78)
+```
+
+```{r ttest pos}
+print("goemo")
+t.test(positive~Case, data=data6_r2)
+print("ekman")
+t.test(positive~Case, data = data1_r2)
+print("liwc")
+t.test(posemo~Case, data=data6_liwc_pos)
+```
+
+```{r roc}
+pred <- prediction( data678$trace, data678$Case )
+pred2 <- prediction( data128$trace, data128$Case )
+pred3 <- prediction( data6liwc78$trace, data6liwc78$Case )
+perf <- performance( pred, "tpr", "fpr" )
+perf2 <- performance(pred2, "tpr", "fpr")
+perf3 <- performance(pred3, "tpr", "fpr")
+plot( perf, col="red")
+text = performance(pred, "auc")@y.values
+text(1,0.25,labels=paste("GoEmo =",text,sep=" "))
+plot(perf2, col="blue",add = TRUE)
+text2 = performance(pred2, "auc")@y.values
+text(1,0.20,labels=paste("Ekman =",text2,sep=" "))
+plot(perf3, col="green", add=TRUE)
+text3 = performance(pred3, "auc")@y.values
+text(.88,0.15,labels=paste("LIWC =",text3, sep = " "))
+legend("right", c("GoEmo", "Ekman","LIWC"), lty=1, 
+    col = c("red", "blue", "green"), bty="n", inset=c(0,-0.15))
+```
+
+```{r acc}
+perf = performance(pred, measure = "acc")
+perf2 = performance(pred2, measure = "acc")
+perf3 = performance(pred3, measure = "acc")
+plot( perf, col="red")
+text = performance(pred, "auc")@y.values
+text(1,0.25,labels=paste("GoEmo =",text,sep=" "))
+plot(perf2, col="blue",add = TRUE)
+text2 = performance(pred2, "auc")@y.values
+text(1,0.20,labels=paste("Ekman =",text2,sep=" "))
+plot(perf3, col="green", add=TRUE)
+text3 = performance(pred3, "auc")@y.values
+text(1,0.15,labels=paste("LIWC =",text3,sep=" "))
+legend(0.8,0.5, c("GoEmo", "Ekman","LIWC"), lty=1, 
+    col = c("red", "blue", "green"), bty="n", inset=c(0,-0.15))
+```
+
+```{r precision recal}
+perf <- performance( pred, "prec", "rec" )
+perf2 <- performance(pred2, "prec", "rec")
+perf3 <- performance(pred3, "prec", "rec")
+plot( perf, col="red")
+text = performance(pred, "auc")@y.values
+text(1,0.25,labels=paste("GoEmo =",text,sep=" "))
+plot(perf2, col="blue",add = TRUE)
+text2 = performance(pred2, "auc")@y.values
+text(1,0.20,labels=paste("Ekman =",text2,sep=" "))
+plot(perf3, col="green", add=TRUE)
+text3 = performance(pred3, "auc")@y.values
+text(1,0.15,labels=paste("LIWC =",text3,sep=" "))
+legend("right", c("GoEmo", "Ekman","LIWC"), lty=1, 
+    col = c("red", "blue", "green"), bty="n", inset=c(0,-0.15))
+```
+
+
+

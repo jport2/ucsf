@@ -33,6 +33,7 @@ emo_unblind <- right_join(goemo,data,by="Filename")
 emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
 data2 <- emo_unblind
 
+#emo_unblind <- emo_unblind %>% filter(emo == "joy")
 temp <- emo_unblind %>% group_by(Case) %>% summarise_all(funs(mean(., na.rm = TRUE)))
 a <- data.frame()
 for(i in 2:29){
@@ -81,8 +82,9 @@ data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
 
 emo_unblind <- right_join(goemo,data,by="Filename")
 emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
-
+#emo_unblind <- emo_unblind %>% filter(emo == "neg")
 data2 <- emo_unblind
+
 # create ID treatment
 # group_by id treatment
 #data2 <- data2 %>% group_by(participantID.x) %>% summarise_all(funs(mean))
@@ -94,8 +96,10 @@ data_pl <- data_pl %>% group_by(participantID.x) %>% summarise_all(funs(mean))
 
 # group_by id
 colnames(data_pl) <- paste(colnames(data_pl),"1", sep = ".")
-data5 <- cbind(data_oxy,data_pl)
-emo_unblind_pair <- data5[complete.cases(data5$anger),]
+data_pl$participantID.x <- data_pl$participantID.x.1
+data5 <- left_join(data_oxy,data_pl, by="participantID.x")
+emo_unblind_pair <- data5[complete.cases(data5$anger.1),]
+emo_unblind_pair <- as.data.frame(emo_unblind_pair)
 a <- data.frame()
 for(i in 3:9){
   var1 <- colnames(emo_unblind_pair)[i]

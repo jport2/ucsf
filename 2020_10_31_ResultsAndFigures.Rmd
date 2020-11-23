@@ -1,0 +1,409 @@
+---
+title: "Evocative Videos Results and Figures"
+author: "Jake Portanova"
+date: "October 31, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(xlsx)
+library(wordspace)
+library(ROCR)
+setwd("C:/Users/jakep/Desktop")
+demo <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data <- data %>% filter(drugCondition == "PL")
+data$file <- paste(data$participantID.y,data$stimulus,sep="_")
+setwd("C:/Users/jakep/Desktop")
+coherence <- read.csv("coherenceresult.csv")
+coherencepl <- left_join(coherence, data, by="file")
+coherencepl$id <- substr(coherencepl$file,1,4)
+coherenceplr <- coherencepl %>% group_by(id) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+cohdemo <- inner_join(coherenceplr,demo,by="id")
+cohdemo$LackOfSpontaneityFlowOfConverstation <- cohdemo$X8..Lack.of.Spontaneity.Flow.of.Conversation   
+cohdemo$ConceptualDisorganization <- cohdemo$X13..Conceptual.Disorganization
+cohdemo$IncoherentSpeech <- cohdemo$X14..Incoherent.Speech                                        
+cohdemo$PovertyOfSpeechContent <- cohdemo$X15..Poverty.of.Speech.Content 
+
+## T-test and ROC GoEmo Processing
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+goemo <- goemo[-which(goemo$thing=="heart"),]
+goemo$feeldescribe <- sapply(strsplit(goemo$Filename, "_"), "[", 4)
+goemo <- goemo[grep("feel",goemo$feeldescribe),]
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
+
+emo_unblind2 <- emo_unblind[,c("positive","negative")]
+data_raw <- emo_unblind %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative","neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+emo_unblind_norm[,"pos_max"] <- apply(emo_unblind_norm[,c("admiration", "amusement","approval",
+                           "caring", "desire", "excitement", "gratitude", 
+                           "joy", "love","optimism", "pride", "relief")],1,max)
+emo_unblind_norm[,"neg_max"] <- apply(emo_unblind_norm[,c("anger", "annoyance", "disappointment", "disapproval","disgust","embarrassment","fear","grief","nervousness", "remorse","sadness")],1,max)
+data5 <- emo_unblind_norm %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data5$Case <- as.factor(substr(data5$id,1,1))
+
+setwd("C:/Users/jakep/Dropbox/jakeLIWCanalyes")
+library(xlsx)
+library(irr)
+stimuliRatings <- read.xlsx("evocativeVideoTask_stimuliRatings_2020-10-21.xlsx", sheetIndex = 1)
+mydata <- select(stimuliRatings, contains("valence"))
+mydata[mydata == ""] <- NA
+mydata <- mydata[-c(1,2),]
+mydata <- mydata[1:23,]
+mydata <- mydata %>% select(matches("baby|dog|grandpa|phone|heart|bugear|lightsout|nuts|dying|coffe|larva|broken"))
+```
+
+## R Markdown
+
+Key figures for the paper
+
+TABLE: Demographics & clinical information for SZ and HC
+Age
+Education years
+Symptom scores
+PANSS+
+CAINS
+CPZ equivalents
+any other relevant baseline measures
+FIG: Group differences in trace (SZ vs HC)?
+FIG: Prediction of group status by positive emotion alignment (AUC)
+FIG: Oxytocin effects on trace in SZ?
+FIG: Moderation of oxytocin effects in SZ by ... symptom severity, CPZ equivalents, attachment style
+
+```{r table}
+setwd("C:/Users/jakep/Desktop")
+sz <- read.csv("PORQ_demographicAndBaselineDayData_labeled.csv")
+#View(sz)
+#sz <- load("PORQ_demographicAndBaselineDayData.r")
+#sz$Item.1..Motivation.for.Close.Family.Spouse.Partner.Relationships <-
+ # sub('^[^_]*_(\\d+).*', '\\1',sz$Item.1..Motivation.for.Close.Family.Spouse.Partner.Relationships)
+ # as.numeric(gsub("([0-9]+).*$", "\\1", sz$Item.1..Motivation.for.Close.Family.Spouse.Partner.Relationships))
+#  gsub("[^0-9.]", "",  sz$Item.1..Motivation.for.Close.Family.Spouse.Partner.Relationships)
+for(i in 62:221){
+  sz[,i] <- as.numeric(gsub("[^0-9.]", "",sz[,i]))
+}
+sz[,c("X")] <- as.numeric(gsub("[^0-9.]", "",sz[,"X"]))
+sz$CPZ <- sz$X
+
+# CAINS (NEGATIVE SYMPTOMS)
+sz$CAINS <- sz[,62]+sz[,63]+sz[,64]+sz[,65]+sz[,66]+sz[,67]+sz[,68]+
+  sz[,69]+sz[,70]+sz[,71]+sz[,72]+sz[,73]+sz[,74]
+# neg symp with dose
+#ggplot(data=sz, aes(x=CAINS, y=X))+geom_point()+geom_smooth(method=lm)
+#cor(sz$CAINS, sz$X, use="complete.obs")
+# PANSS
+sz$PANSSpos <- sz[,75]+ sz[,76]+sz[,77]+sz[,78]+sz[,79]
+sz$PANSSneg <- sz[,80]
+sz$PANSSdisorganization <- sz[,81]+ sz[,82]+sz[,83]
+
+# QLS
+sz$QLS <- sz$Subscale.total.
+
+# Role functioning scale
+sz$RFS <- sz[,88]+sz[,89]+sz[,90]+sz[,91]
+
+# Hinting Task
+sz$Hinting <- sz$Total+sz$Total.1+sz$Total.2+sz$Total.3+sz$Total.4+
+  sz$Total.5+sz$Total.6+sz$Total.7+sz$Total.8+sz$Total.9
+
+# AMNART
+sz$AMNART <- sz$Total.score
+
+# Defeatest Beliefs
+sz$Defeatist <- sz[,172]+sz[,173]+sz[,174]+sz[,175]+sz[,176]+sz[,178]+
+  sz[,179]+sz[,180]+sz[,181]+sz[,182]+sz[,183]+sz[,184]+sz[,185]
+
+# ECRRS
+sz$ECRRS_Mom <- ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R.)+
+  (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R.) +
+  (8-sz$I.talk.things.over.with.this.person..R.) +
+  (8-sz$I.find.it.easy.to.depend.on.this.person..R.)+
+  sz$I.don.t.feel.comfortable.opening.up.to.this.person +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down. +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me +
+  sz$I.m.afraid.that.this.person.may.abandon.me +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her)/9
+sz$ECRRS_Mom_Attachment <- ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R.)+
+  (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R.) +
+  (8-sz$I.talk.things.over.with.this.person..R.) +
+  (8-sz$I.find.it.easy.to.depend.on.this.person..R.))/4
+sz$ECRRS_Mom_Avoidance <-
+  (sz$I.don.t.feel.comfortable.opening.up.to.this.person +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down. +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me +
+  sz$I.m.afraid.that.this.person.may.abandon.me +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her)/5
+sz$ECRRS_Dad <- 
+  ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R..1)+
+  (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R..1) +
+  (8-sz$I.talk.things.over.with.this.person..R..1) +
+  (8-sz$I.find.it.easy.to.depend.on.this.person..R..1)+
+  sz$I.don.t.feel.comfortable.opening.up.to.this.person.1 +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down..1 +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me.1 +
+  sz$I.m.afraid.that.this.person.may.abandon.me.1 +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.1)/9
+sz$ECRRS_Dad_Attachment <- 
+  ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R..1)+
+     (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R..1) +
+     (8-sz$I.talk.things.over.with.this.person..R..1) +
+     (8-sz$I.find.it.easy.to.depend.on.this.person..R..1))/4
+sz$ECRRS_Dad_Avoidance <- 
+  (sz$I.don.t.feel.comfortable.opening.up.to.this.person.1 +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down..1 +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me.1 +
+  sz$I.m.afraid.that.this.person.may.abandon.me.1 +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.1)/5
+sz$ECRRS_Friend <- 
+  ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R..2)+
+  (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R..2) +
+  (8-sz$I.talk.things.over.with.this.person..R..2) +
+  (8-sz$I.find.it.easy.to.depend.on.this.person..R..2)+
+  sz$I.don.t.feel.comfortable.opening.up.to.this.person.2 +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down..2 +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me.2 +
+  sz$I.m.afraid.that.this.person.may.abandon.me.2 +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.2)/9
+sz$ECRRS_Friend_Attachment <- 
+  ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R..2)+
+     (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R..2) +
+     (8-sz$I.talk.things.over.with.this.person..R..2) +
+     (8-sz$I.find.it.easy.to.depend.on.this.person..R..2))/4
+sz$ECRRS_Friend_Avoidance <-   
+  (sz$I.don.t.feel.comfortable.opening.up.to.this.person.2 +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down..2 +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me.2 +
+  sz$I.m.afraid.that.this.person.may.abandon.me.2 +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.2)/5
+sz$ECRRS_Romantic <- 
+  ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R..3)+
+  (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R..3) +
+  (8-sz$I.talk.things.over.with.this.person..R..3) +
+  (8-sz$I.find.it.easy.to.depend.on.this.person..R..3)+
+  sz$I.don.t.feel.comfortable.opening.up.to.this.person.3 +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down..3 +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me.3 +
+  sz$I.m.afraid.that.this.person.may.abandon.me.3 +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.3)/9
+sz$ECRRS_Romantic_Attachment <- 
+  ((8-sz$It.helps.to.turn.to.this.person.in.times.of.need..R..3)+
+      (8-sz$I.usually.discuss.my.problems.and.concerns.with.this.person..R..3) +
+         (8-sz$I.talk.things.over.with.this.person..R..3) +
+            (8-sz$I.find.it.easy.to.depend.on.this.person..R..3))/4
+sz$ECRRS_Romantic_Avoidance <- 
+  (sz$I.don.t.feel.comfortable.opening.up.to.this.person.3 +
+  sz$I.prefer.not.to.show.this.person.how.I.feel.deep.down..3 +
+  sz$I.often.worry.that.this.person.doesn.t.really.care.for.me.3 +
+  sz$I.m.afraid.that.this.person.may.abandon.me.3 +
+  sz$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.3)/5
+
+sz$ECRRS <- apply(sz[,c("ECRRS_Mom", "ECRRS_Dad", "ECRRS_Friend",
+                                   "ECRRS_Romantic")],1,mean, na.rm=TRUE)
+sz$ECRRS_Attachment <- apply(sz[,c("ECRRS_Mom_Attachment", "ECRRS_Dad_Attachment", "ECRRS_Friend_Attachment",
+            "ECRRS_Romantic_Attachment")],1,mean, na.rm=TRUE)
+sz$ECRRS_Avoidance <- apply(sz[,c("ECRRS_Mom_Avoidance", "ECRRS_Dad_Avoidance", "ECRRS_Friend_Avoidance",
+                                   "ECRRS_Romantic_Avoidance")],1,mean, na.rm=TRUE)
+
+sz$id <- sz[,1]
+sz$Case <- substr(sz$id,1,1)
+
+#setwd("C:/Users/jakep/Dropbox/jakeLIWCanalyes")
+#write.csv(sz, "PORQ_demographicAndBaselineDayData_labeled_scales_updated.csv")
+
+table <- sz[,222:248]
+table <- table %>% group_by(Case) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+sz2 <- sz %>% select(one_of(c('Case','Age','Years.of.Education','CPZ','CAINS','PANSSpos','QLS','RFS','AMNART','Hinting',
+                              'Defeatist','ECRRS_Attachment','ECRRS_Avoidance')))
+sz2[,c("Years.of.Education")] <- as.numeric(gsub("[^0-9.]", "",sz2[,c("Years.of.Education")]))
+sz2 <- sz2 %>% group_by(Case)%>% summarise_all(funs(mean(., na.rm = TRUE)))
+#write.csv(sz2, "Demographic_Table_For_Paper.csv")
+print(sz2)
+```
+
+## Pos Align Plots
+
+```{r pos}
+data_joy <- data5 %>% filter(emo == "joy")
+levels(data_joy$Case) <- list(Schizophrenia = "7",Healthy = "8")
+t <- t.test(positive~Case, data=data_joy)
+print(t)
+ggplot(data_joy, aes(x=Case, y=positive))+geom_boxplot()+ggtitle("Positive Alignment Group Differences")
+```
+
+## Trace Plots
+
+
+```{r pressure, echo=FALSE}
+data6 <- data5 %>% filter(emo == "joy")
+data6_r <- data6[,c("positive","negative")]
+data6_r <- normalize.rows(as.matrix(data6_r),method="manhattan")
+data6 <- data6[ , -which(names(data6) %in% c("positive","negative"))]
+data6_r <- as.data.frame(data6_r)
+data6_r2 <- cbind(data6,data6_r)
+data7 <- data5 %>% filter(emo=="neg")
+data7_r <- data7[,c("positive","negative")]
+data7_r <- normalize.rows(as.matrix(data7_r),method="manhattan")
+data7 <- data7[ , -which(names(data7) %in% c("positive","negative"))]
+data7_r <- as.data.frame(data7_r)
+data7_r2 <- cbind(data7,data7_r)
+data67 <- inner_join(data6_r2, data7_r2, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data678 <- inner_join(data67, data8, by="id")
+data678$trace <- data678$positive.x + data678$negative.y 
+t3 <- t.test(trace~Case, data=data678)
+print(t3)
+levels(data678$Case) <- list(Schizophrenia = "7",Healthy = "8")
+ggplot(data678,aes(x=Case,y=trace))+geom_boxplot()+ggtitle("Group Differences in Trace")
+```
+
+## Oxy v Pl
+
+## ROC
+
+```{r roc}
+pred <- prediction( data678$trace, data678$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="red")
+text(.9,0.35,labels=paste("Trace_AUC =",text,sep=" "), cex=0.75)
+
+
+pred <- prediction( data_joy$positive, data_joy$Case )
+perf <- performance( pred, "tpr", "fpr" )
+text = performance(pred, "auc")@y.values
+plot( perf, col="blue", add=TRUE)
+text(.9,0.3,labels=paste("PositiveAlignment_AUC =",text,sep=" "), cex=0.75)
+```
+
+```{r oxy}
+# library(xlsx)
+# library(dplyr)
+# library(ggplot2)
+# library(wordspace)
+# setwd("C:/Users/jakep/Desktop")
+# baseline_scales <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data$Case <- substr(data$participantID.y,1,1)
+data <- data %>% filter(Case == "7")
+# join to go emotions
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+goemo <- goemo[-which(goemo$thing=="heart"),]
+goemo$feeldescribe <- sapply(strsplit(goemo$Filename, "_"), "[", 4)
+goemo <- goemo[grep("feel",goemo$feeldescribe),]
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
+
+emo_unblind2 <- emo_unblind[,c("positive","negative")]
+data_raw <- emo_unblind %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative","neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+emo_unblind_norm[,"pos_max"] <- apply(emo_unblind_norm[,c("admiration", "amusement","approval",
+                           "caring", "desire", "excitement", "gratitude", 
+                           "joy", "love","optimism", "pride", "relief")],1,max)
+emo_unblind_norm[,"neg_max"] <- apply(emo_unblind_norm[,c("anger", "annoyance", "disappointment", "disapproval","disgust","embarrassment","fear","grief","nervousness", "remorse","sadness")],1,max)
+data5 <- emo_unblind_norm %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+
+#data4 <- emo_unblind %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+emo_unblind2 <- emo_unblind_norm %>% filter(drugCondition == "OT")
+data5 <- emo_unblind2 %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data5$Case <- as.factor(substr(data5$id,1,1))
+data6 <- data5 %>% filter(emo == "joy")
+data7 <- data5 %>% filter(emo=="neg")
+data67 <- inner_join(data6, data7, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data678 <- inner_join(data67, data8, by="id")
+data678$trace <- data678$positive.x + data678$negative.y 
+data678$Case <- substr(data678$id,1,1)
+
+emo_unblind3 <- emo_unblind_norm %>% filter(drugCondition == "PL")
+data5 <- emo_unblind3 %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data6 <- data5 %>% filter(emo == "joy")
+data7 <- data5 %>% filter(emo=="neg")
+data67 <- inner_join(data6, data7, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data789 <- inner_join(data67, data8, by="id")
+data789$trace <- data789$positive.x + data789$negative.y
+data789$Case <- substr(data789$id,1,1)
+
+
+data678$drugCondition <- "OT"
+data789$drugCondition <- "PL"
+data789$Case.x <- as.factor(data789$Case.x)
+data789$Case.y <- as.factor(data789$Case.y)
+datarbind <- rbind(data678,data789)
+
+#datanew <- inner_join(data678,data789, by="ID")
+
+#t.test(datanew$trace.x,datanew$trace.y,paired=TRUE)
+ggplot(datarbind, aes(y=trace,x=drugCondition))+geom_boxplot()+ggtitle("Trace Oxytocin Placebo Differences")
+```

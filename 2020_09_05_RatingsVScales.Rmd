@@ -1,0 +1,233 @@
+---
+title: "2020_09_05_Accuracy_Scale_Figures"
+author: "Jake Portanova"
+date: "September 5, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(xlsx)
+setwd("C:/Users/jakep/Desktop")
+baseline_scales <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+ratings <- read.csv("PORQ_animatedShapes_ratings.csv")
+ratings$composite <- ratings$accuracy_rater1 +ratings$accuracy_rater2+ratings$intentionality_rater1+
+  ratings$intentionality_rater2
+ratings$intentionality <- ratings$intentionality_rater1 + ratings$intentionality_rater2
+ratings$accuracy <- ratings$accuracy_rater1 + ratings$accuracy_rater2
+ratings$ID <- as.character(ratings[,1])
+baseline_scales$ID <- as.character(baseline_scales[,2])
+ratings_scales <- inner_join(ratings, baseline_scales, by="ID")
+ratings_scales$Case <- as.factor(substr(ratings_scales$ID,1,1))
+ratings_scales$condition <- gsub("[0-9.+]", "", ratings_scales$stimulus)
+# Unblind Data
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW")
+drugunblind <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex =1)
+# Make all 3 on the same graph
+```
+
+### PCA
+```{r}
+mydata <- baseline_scales[,63:75]
+mydata <- na.omit(mydata)
+fit <- princomp(mydata, cor=TRUE)
+summary(fit) # print variance accounted for
+loadings(fit) # pc loadings
+plot(fit,type="lines") # scree plot
+fit$scores # the principal components
+biplot(fit)
+
+# AMNART
+mydata <- baseline_scales[,187:222]
+mydata2 <- baseline_scales[,c(2,214:222)]
+mydata2$ECRRS_romantic <- mydata2$It.helps.to.turn.to.this.person.in.times.of.need..R..3+
+  mydata2$I.usually.discuss.my.problems.and.concerns.with.this.person..R..3 +
+  mydata2$I.talk.things.over.with.this.person..R..3 +
+  mydata2$I.find.it.easy.to.depend.on.this.person..R..3+
+(8- mydata2$I.don.t.feel.comfortable.opening.up.to.this.person.3) +
+  (8-mydata2$I.prefer.not.to.show.this.person.how.I.feel.deep.down..3) +
+  (8-mydata2$I.often.worry.that.this.person.doesn.t.really.care.for.me.3) +
+  (8-mydata2$I.m.afraid.that.this.person.may.abandon.me.3) +
+  (8-mydata2$I.worry.that.this.person.won.t.care.about.me.as.much.as.I.care.about.him.or.her.3)
+# mydata2$ID <- mydata2[,1]
+# ggplot(mydata2, aes(x=Anxiety,y=Attachment))+geom_point()+
+#   ggrepel::geom_text_repel(aes(label = ID), color = "black", size = 2.5, segment.color = "grey")
+mydata <- na.omit(mydata2)
+fit <- princomp(mydata, cor=TRUE)
+summary(fit) # print variance accounted for
+loadings(fit) # pc loadings
+plot(fit,type="lines") # scree plot
+fit$scores # the principal components
+biplot(fit, cex=.3)
+PCbiplot <- function(PC, x="PC1", y="PC2") {
+    # PC being a prcomp object
+    data <- data.frame(obsnames=row.names(PC$x), PC$x)
+    plot <- ggplot(data, aes_string(x=x, y=y)) + geom_text(alpha=.4, size=3, aes(label=obsnames))
+    plot <- plot + geom_hline(aes(0), size=.2) + geom_vline(aes(0), size=.2)
+    datapc <- data.frame(varnames=rownames(PC$rotation), PC$rotation)
+    mult <- min(
+        (max(data[,y]) - min(data[,y])/(max(datapc[,y])-min(datapc[,y]))),
+        (max(data[,x]) - min(data[,x])/(max(datapc[,x])-min(datapc[,x])))
+        )
+    datapc <- transform(datapc,
+            v1 = .7 * mult * (get(x)),
+            v2 = .7 * mult * (get(y))
+            )
+    plot <- plot + coord_equal() + geom_text(data=datapc, aes(x=v1, y=v2, label=varnames), size = 5, vjust=1, color="red")
+    plot <- plot + geom_segment(data=datapc, aes(x=0, y=0, xend=v1, yend=v2), arrow=arrow(length=unit(0.2,"cm")), alpha=0.75, color="red")
+    plot
+}
+PC <- prcomp(mydata)
+PCbiplot(fit2,x="PC1",y="PC2")
+```
+### Accuracy V Condition
+```{r condition v accuracy, echo=FALSE, warning=FALSE}
+ggplot(ratings_scales, aes(x=condition, y=accuracy, color=Case))+geom_boxplot()+geom_smooth(method=lm)
+ratings_scales %>% group_by(Case, condition)%>% summarise(acc = mean(accuracy, na.rm=TRUE),int=mean(intentionality, na.rm=TRUE))+ggtitle("Accuracy by Condition")                              
+```
+### Hinting v accurary and intentionality
+
+```{r hinting}
+cor(ratings_scales$Hinting, ratings_scales$accuracy, use="complete.obs")
+cor(ratings_scales$Hinting, ratings_scales$intentionality, use="complete.obs")
+```
+
+### MEDS V POSITIVE AND NEGATIVE SYMPTOMS + Age
+```{r meds,echo=FALSE,warning=FALSE}
+cor(ratings_scales$CAINS,ratings_scales$X, use="complete.obs")
+ggplot(ratings_scales, aes(x=X,y=CAINS))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=PANSSpos, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=PANSSneg, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=PANSSdisorganization, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=RFS, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=QLS, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=Defeatist, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=Hinting, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=ECRRS, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=ECRRSmom, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=ECRRSdad, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=ECRRSromantic, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X,y=ECRRSfriend, size=Age))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=Age,y=X))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=Age,y=CAINS))+geom_point()+geom_smooth(method=lm)
+```
+
+
+## Delusions v accuracy/intentionality
+```{r delusions, echo=FALSE, warning=FALSE}
+ratings_scales2 <- ratings_scales %>% filter(condition == "tom")
+ggplot(ratings_scales, aes(x=X2..Delusions, y=accuracy))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales2, aes(x=X2..Delusions, y=accuracy))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales, aes(x=X2..Delusions, y=intentionality))+geom_point()+geom_smooth(method=lm)
+ggplot(ratings_scales2, aes(x=X2..Delusions, y=intentionality))+geom_point()+geom_smooth(method=lm)
+```
+
+## Accuracy versus Scales
+
+Here are some plots with the scales and accuracy. The error bar is the standard error. The standard error of the regression provides the absolute measure of the typical distance that the data points fall from the regression line.
+
+```{r accuracy, warning=FALSE}
+# QLS
+ggplot(ratings_scales, aes(x=QLS , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+# RFS
+ggplot(ratings_scales, aes(x=RFS , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# CAINS
+ggplot(ratings_scales, aes(x=CAINS , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS NEG
+ggplot(ratings_scales, aes(x=PANSSneg , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS POS
+ggplot(ratings_scales, aes(x=PANSSpos , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS POS
+ggplot(ratings_scales2, aes(x=PANSSpos , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS disorganization
+ggplot(ratings_scales, aes(x=PANSSdisorganization , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# AMNART
+ggplot(ratings_scales, aes(x=AMNART , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# Hinting
+ggplot(ratings_scales, aes(x=Hinting , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# Defeatist
+ggplot(ratings_scales, aes(x=Defeatist , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# ECRRS
+ggplot(ratings_scales, aes(x=ECRRS , y=accuracy, color=Case))+geom_point()+geom_smooth(method=lm)
+```
+
+## intentionality versus Scales
+
+Here are some plots with the scales and intentionality
+
+```{r intentionality, warning=FALSE}
+# QLS
+ggplot(ratings_scales, aes(x=QLS , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+# RFS
+ggplot(ratings_scales, aes(x=RFS , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# CAINS
+ggplot(ratings_scales, aes(x=CAINS , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS NEG
+ggplot(ratings_scales, aes(x=PANSSneg , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS POS
+ggplot(ratings_scales, aes(x=PANSSpos , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS disorganization
+ggplot(ratings_scales, aes(x=PANSSdisorganization , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# AMNART
+ggplot(ratings_scales, aes(x=AMNART , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# Hinting
+ggplot(ratings_scales, aes(x=Hinting , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# Defeatist
+ggplot(ratings_scales, aes(x=Defeatist , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# ECRRS
+ggplot(ratings_scales, aes(x=ECRRS , y=intentionality, color=Case))+geom_point()+geom_smooth(method=lm)
+```
+
+## composite versus Scales
+
+Here are some plots with the scales and composite
+
+```{r composite, warning=FALSE}
+# QLS
+ggplot(ratings_scales, aes(x=QLS , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+# RFS
+ggplot(ratings_scales, aes(x=RFS , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# CAINS
+ggplot(ratings_scales, aes(x=CAINS , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS NEG
+ggplot(ratings_scales, aes(x=PANSSneg , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS POS
+ggplot(ratings_scales, aes(x=PANSSpos , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# PANSS disorganization
+ggplot(ratings_scales, aes(x=PANSSdisorganization , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# AMNART
+ggplot(ratings_scales, aes(x=AMNART , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# Hinting
+ggplot(ratings_scales, aes(x=Hinting , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# Defeatist
+ggplot(ratings_scales, aes(x=Defeatist , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+
+# ECRRS
+ggplot(ratings_scales, aes(x=ECRRS , y=composite, color=Case))+geom_point()+geom_smooth(method=lm)
+```

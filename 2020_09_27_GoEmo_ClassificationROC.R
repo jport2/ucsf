@@ -38,64 +38,43 @@ data2 <- emo_unblind
 # Define emotions
 #emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
 emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
-  emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
-  emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
 
 emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
                            emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
                            emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
                            emo_unblind$remorse+emo_unblind$sadness)/11
 
-data4 <- emo_unblind %>% filter(Case == "7")
+data4 <- emo_unblind 
+data4$Case <- as.numeric(data4$Case)
 # (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
 data5 <- data4 %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
-data5 <- data5 %>% group_by(emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
-#data4 <- data3 %>% group_by(participantID.y) %>% summarise_all(funs(mean))
+data5$Case <- as.factor(substr(data5$id,1,1))
+data_joy <- data5 %>% filter(emo == "joy")
+t.test(positive~Case, data=data_joy)
+data_joy$Case <- as.factor(data_joy$Case)
 
-# (3) the result should be a 3x3 matrix
-data6 <- data5[,c("emo","positive","negative","neutral")]
-# (4) row normalize (the rows are videos, the columns emotions)
-data7 <- normalize.rows(as.matrix(data6[,2:4]),method="manhattan")
-# (5) take the trace (sum of the diagonal)
-sum(diag(data7))
-
-# Case == "8"
-data4 <- emo_unblind %>% filter(Case == "8")
-data4$emo <- gsub(" neg","neg",data4$emo)
-# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
-data5 <- data4 %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
-data5 <- data5 %>% group_by(emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
-#data4 <- data3 %>% group_by(participantID.y) %>% summarise_all(funs(mean))
-
-# (3) the result should be a 3x3 matrix
-data6 <- data5[,c("emo","positive","negative","neutral")]
-# (4) row normalize (the rows are videos, the columns emotions)
-data7 <- normalize.rows(as.matrix(data6[,2:4]),method="manhattan")
-# (5) take the trace (sum of the diagonal)
-sum(diag(data7))
+set.seed(8)
+samp <- sample(c(1:88), size=71, replace=FALSE)
+train <- data_joy[samp,]
+test <- data_joy[-samp,]
+glm <- glm(Case~positive,data=train,family=binomial())
+library(pROC)
+test_prob = predict(glm, newdata = test, type = "response")
+test_roc = roc(test$Case ~ test_prob, plot = TRUE, print.auc = TRUE)
+test_roc
 
 
-
-### For OT Cases
-# library(xlsx)
-# library(dplyr)
-# setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
-# evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
-# 
-# # read unbinding
-# setwd("..")
-# unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
-# 
-# # IDDay
-# evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
-# unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+# Oxy
 
 # Join on ID Day
 data <- full_join(unblinding, evoc_trans, by="IDDay")
 # replace na's for 8 with pl
 data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
 # filter for only placebo
-data <- data %>% filter(drugCondition == "OT")
+#data$Case <- substr(data$Filename,1,1)
+#data <- data %>% filter(Case == "7")
 # join to go emotions
 setwd("C:/Users/jakep/Desktop")
 goemo <- read.csv("go_emotions_output.csv")
@@ -114,23 +93,28 @@ data2 <- emo_unblind
 
 # Define emotions
 #emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
-emo_unblind$positive <- emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
-  emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
-  emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
 
-emo_unblind$negative <- emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+emo_unblind$fear+emo_unblind$grief+
-  emo_unblind$nervousness + emo_unblind$remorse+emo_unblind$sadness
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
 
-data4 <- emo_unblind %>% filter(Case == "7")
+data4 <- emo_unblind 
+#data4$Case <- as.numeric(data4$Case)
+data4 <- data4 %>% filter(Case == "7")
+#data4$drugCondition <- as.integer(data4$drugCondition)
 # (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
-data5 <- data4 %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
-data5 <- data5 %>% group_by(emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
-#data4 <- data3 %>% group_by(participantID.y) %>% summarise_all(funs(mean))
-
-# (3) the result should be a 3x3 matrix
-data6 <- data5[,c("emo","positive","negative","neutral")]
-# (4) row normalize (the rows are videos, the columns emotions)
-data7 <- normalize.rows(as.matrix(data6[,2:4]),method="manhattan")
-# (5) take the trace (sum of the diagonal)
-sum(diag(data7))
-
+data5 <- data4 %>% group_by(id, drugCondition, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data_joy <- data5 %>% filter(emo == "joy")
+#data_joy$Case <- as.factor(data_joy$Case)
+set.seed(8)
+samp <- sample(c(1:76), size=61, replace=FALSE)
+train <- data_joy[samp,]
+test <- data_joy[-samp,]
+glm <- glm(drugCondition~neutral,data=train,family=binomial())
+library(pROC)
+test_prob = predict(glm, newdata = test, type = "response")
+test_roc = roc(test$drugCondition ~ test_prob, plot = TRUE, print.auc = TRUE)

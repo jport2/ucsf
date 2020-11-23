@@ -1,0 +1,64 @@
+---
+title: "Coherence Metrics V PANSS Coherence"
+author: "Jake Portanova"
+date: "November 3, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(xlsx)
+library(wordspace)
+library(ROCR)
+setwd("C:/Users/jakep/Desktop")
+demo <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+data <- data %>% filter(drugCondition == "PL")
+data$file <- paste(data$participantID.y,data$stimulus,sep="_")
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+coherence <- read.csv("coherenceresult.csv")
+coherencepl <- left_join(coherence, data, by="file")
+coherencepl$id <- substr(coherencepl$file,1,4)
+coherenceplr <- coherencepl %>% group_by(id) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+cohdemo <- inner_join(coherenceplr,demo,by="id")
+cohdemo$LackOfSpontaneityFlowOfConverstation <- cohdemo$X8..Lack.of.Spontaneity.Flow.of.Conversation   
+cohdemo$ConceptualDisorganization <- cohdemo$X13..Conceptual.Disorganization
+cohdemo$IncoherentSpeech <- cohdemo$X14..Incoherent.Speech                                        
+cohdemo$PovertyOfSpeechContent <- cohdemo$X15..Poverty.of.Speech.Content 
+```
+
+```{r concept, warning=FALSE, echo=FALSE}
+for(i in 4:38){
+  var <- colnames(cohdemo)[i]
+  g <- ggplot(cohdemo, aes_string(y=cohdemo$ConceptualDisorganization, x=var))+geom_point()+geom_smooth(method="lm")+ggtitle(paste("Incoherent Speech Versus",var, sep=" "))
+  print(g)
+}
+```
+
+
+```{r incoh, warning=FALSE, echo=FALSE}
+for(i in 4:38){
+  var <- colnames(cohdemo)[i]
+  g <- ggplot(cohdemo, aes_string(x=cohdemo$IncoherentSpeech, y=var))+geom_point()+geom_smooth(method="lm")+ggtitle(paste("Incoherent Speech Versus",var, sep=" "))
+  print(g)
+}
+```
+
+
+

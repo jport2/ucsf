@@ -7,10 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-setwd("~/Downloads")
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/geometricShapesTask")
 tom <- read.csv("LIWC2015_results_PORQ_geometricShapes_transcripts_nosource.csv")
 tom <- tom[1:762,]
-
 coherence <- read.csv("tom/coherenceresult.csv")
 library(dplyr)
 #tom <- tom %>% select(one_of('Case','Source..A.','Source..C.','WPS','cogproc','tentat','nonflu'))
@@ -36,6 +35,7 @@ tom$Case <- as.numeric(as.character(tom$Case))
 tom <- tom %>% rename(Day = Source..B.)
 tom$Day <- as.factor(tom$Day)
 tom <- tom %>% mutate(IDDay = paste(Source..A.,Day,sep="_"))
+setwd("..")
 drugunbind <- read.csv("PORQ_drugUnblinding.csv")
 drugunbind <- drugunbind %>% mutate(IDDay = paste(participantID,day,sep="_"))
 tom <- full_join(tom, drugunbind, by="IDDay")
@@ -47,6 +47,26 @@ tom <- tom %>% group_by(Source..A.) %>% summarise_all(funs(mean))
 tom <- as.data.frame(tom)
 tom <- tom[,c(2,101:135)]
 ```
+
+```{r ratings_scales, echo=FALSE, warning=F}
+library(dplyr)
+library(ggplot2)
+setwd("C:/Users/jakep/Desktop")
+baseline_scales <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+ratings <- read.csv("PORQ_animatedShapes_ratings.csv")
+ratings$composite <- ratings$accuracy_rater1 +ratings$accuracy_rater2+ratings$intentionality_rater1+
+  ratings$intentionality_rater2
+ratings$intentionality <- ratings$intentionality_rater1 + ratings$intentionality_rater2
+ratings$accuracy <- ratings$accuracy_rater1 + ratings$accuracy_rater2
+ratings$ID <- as.character(ratings[,1])
+baseline_scales$ID <- as.character(baseline_scales[,2])
+ratings_scales <- inner_join(ratings, baseline_scales, by="ID")
+ratings_scales$Case <- as.factor(substr(ratings_scales$ID,1,1))
+ratings_scales$condition <- gsub("[0-9.+]", "", ratings_scales$stimulus)
+```
+
+```{r merge}
+
 
 ```{r}
 a <- data.frame()

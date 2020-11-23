@@ -7,11 +7,13 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-setwd("~/Downloads")
+#setwd("~/Downloads")
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW")
 tom <- read.csv("LIWC2015_results_PORQ_geometricShapes_transcripts_nosource.csv")
 tom <- tom[1:762,]
 library(ggplot2)
 library(dplyr)
+tom$Case <- substr(tom$Source..A.,1,1)
 tom$Case <- as.factor(tom$Case)
 tom$SourceC <- tom$Source..C.
 tom$SourceC <- as.factor(tom$SourceC)
@@ -24,7 +26,7 @@ tom$Case <- as.numeric(as.character(tom$Case))
 tom <- tom %>% rename(Day = Source..B.)
 tom$Day <- as.factor(tom$Day)
 tom <- tom %>% mutate(IDDay = paste(Source..A.,Day,sep="_"))
-drugunbind <- read.csv("PORQ_drugUnblinding.csv")
+drugunbind <- read.xlsx("PORQ_drugUnblinding.xlsx",sheetIndex=1)
 drugunbind <- drugunbind %>% mutate(IDDay = paste(participantID,day,sep="_"))
 tom <- full_join(tom, drugunbind, by="IDDay")
 tom <- tom %>% rename(Oxytocin = drugCondition)

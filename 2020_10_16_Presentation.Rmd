@@ -1,0 +1,497 @@
+---
+title: "2020_10_16_Presentation"
+author: "Jake Portanova"
+date: "October 15, 2020"
+output: ioslides_presentation
+---
+```{r setup1, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xlsx)
+library(dplyr)
+library(ggplot2)
+library(wordspace)
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+evoc_trans <- read.xlsx("PORQ_evocativeVideoTask_transcripts.xlsx", sheetIndex = 1)
+
+# read unbinding
+setwd("..")
+unblinding <- read.xlsx("PORQ_drugUnblinding.xlsx", sheetIndex = 1)
+
+# IDDay
+evoc_trans$IDDay <- paste(evoc_trans$participantID, evoc_trans$day, sep="_")
+unblinding$IDDay <- paste(unblinding$participantID, unblinding$day, sep="_")
+
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+data$drugCondition <- factor(data$drugCondition, levels = c("PL","OT","HC"))
+data[is.na(data$drugCondition),c("drugCondition")] <- "HC"
+# filter for only placebo
+#data <- data %>% filter(drugCondition == "PL")
+# join to go emotions
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+goemo$feeldescribe <- sapply(strsplit(goemo$Filename, "_"), "[", 4)
+goemo <- goemo[grep("feel",goemo$feeldescribe),]
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
+
+emo_unblind2 <- emo_unblind[,c("positive","negative","neutral")]
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative","neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+
+#data4 <- emo_unblind_norm %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+emo_unblind_norm$Video <- paste(emo_unblind_norm$emo, emo_unblind_norm$thing, sep="_")
+data5 <- emo_unblind_norm %>% group_by(id, Video, drugCondition) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data5 <- data5[-which(data5$Video %in% c("neu_yawns","NA_NA","neg_mygirl","neg_cafe","neg_bugbear")),]
+data5$Control <- substr(data5$id,1,1)
+data5 <- data5 %>% filter(Control == "7")
+data5$VideoType <- substr(data5$Video,1,3)
+# setwd("C:/Users/jakep/Desktop")
+# demo <- read.csv("PORQ_demographicAndBaselineDayData_labeled_scales.csv")
+# data6 <- left_join(data5,demo, by="id")
+```
+
+<script>
+  slides > slide.backdrop {
+    background: #4b2e83;
+  }
+</script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+      $('slide:not(.title-slide, .backdrop, .segue)').append('<footer label=\"My amazing footer!\"></footer>');    
+    })
+</script>
+
+<style>
+  footer:after {
+    content: "Cohen Lab";
+    font-size: 12pt;
+    position: absolute;
+    bottom: 20px;
+    left: 60px;
+    line-height: 1.9;
+  }
+</style>
+
+## Presentation Outline
+
+- Density of Emotional Alignment by Feel/Describe in Health Controls
+- Density of Emotional Alignment for Stimuli for Feel
+- Coherence Boxplots on ROC curves
+
+## Density of Positive Emotion in Positive Feel Transcripts in Controls
+```{r, echo=FALSE, warning=FALSE}
+data5 %>% filter(VideoType=="joy") %>% ggplot(aes(x=positive, color=Video))+geom_density()+
+  ggtitle("Density of Positive Emotion for Positive Stimuli in Feel Transcripts Videos for Controls")
+```
+
+## Density of Negative Emotion in Negative Feel Transcripts in Controls
+```{r, echo=FALSE}
+data5 %>% filter(VideoType=="neg") %>% ggplot(aes(x=negative, color=Video))+geom_density()+
+  ggtitle("Density of Negative Emotion for Negative Stimuli in Feel Transcripts for Controls")
+```
+
+## Density of Neutral Emotion in Neutral Feel Transcripts in Controls
+```{r, echo=FALSE}
+data5 %>% filter(VideoType=="neu") %>% ggplot(aes(x=neutral, color=Video))+geom_density()+
+  ggtitle("Density of Neutral Emotion for Neutral Stimuli in Feel Transcripts for Controls")
+```
+
+```{r setup2, echo=FALSE, warning=FALSE}
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+#data$drugCondition <- factor(data$drugCondition, levels = c("PL","OT","HC"))
+data[is.na(data$drugCondition),c("drugCondition")] <- "PL"
+# filter for only placebo
+#data <- data %>% filter(drugCondition == "PL")
+# join to go emotions
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+goemo$feeldescribe <- sapply(strsplit(goemo$Filename, "_"), "[", 4)
+goemo <- goemo[grep("feel",goemo$feeldescribe),] # change to describe later
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
+
+emo_unblind2 <- emo_unblind[,c("positive","negative","neutral")]
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative","neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+
+#data4 <- emo_unblind_norm %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+emo_unblind_norm$Video <- paste(emo_unblind_norm$emo, emo_unblind_norm$thing, sep="_")
+data5 <- emo_unblind_norm %>% group_by(id, Video, drugCondition) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data5 <- data5[-which(data5$Video %in% c("neu_yawns","NA_NA","neg_mygirl","neg_cafe","neg_bugbear")),]
+data5$Control <- substr(data5$id,1,1)
+data5 <- data5 %>% filter(Control == "8")
+data5$VideoType <- substr(data5$Video,1,3)
+```
+
+## Density of Positive Emotion in Positive Describe Transcripts in Controls
+```{r, echo=FALSE}
+data5 %>% filter(VideoType=="joy") %>% ggplot(aes(x=positive, color=Video))+geom_density()+
+  ggtitle("Density of Positive Emotion for Positive Stimuli in Describe Transcripts Videos for HC")
+```
+
+## Density of Negative Emo in Negative Describe Transcripts in Controls
+```{r, echo=FALSE}
+data5 %>% filter(VideoType=="neg") %>% ggplot(aes(x=negative, color=Video))+geom_density()+
+  ggtitle("Density of Negative Emotion for Negative Stimuli in Describe Transcripts for Controls")
+```
+
+## Density of Neutral Emotion in Neutral Feel Transcripts in Controls
+```{r, echo=FALSE}
+data5 %>% filter(VideoType=="neu") %>% ggplot(aes(x=neutral, color=Video))+geom_density()+
+  ggtitle("Density of Neutral Emotion for Neutral Stimuli in Describe Transcripts for Controls")
+```
+
+
+```{r setup3, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# Join on ID Day
+data <- full_join(unblinding, evoc_trans, by="IDDay")
+# replace na's for 8 with pl
+data$drugCondition <- factor(data$drugCondition, levels = c("PL","OT","HC"))
+data[is.na(data$drugCondition),c("drugCondition")] <- "HC"
+# filter for only placebo
+#data <- data %>% filter(drugCondition == "PL")
+# join to go emotions
+setwd("C:/Users/jakep/Desktop")
+goemo <- read.csv("go_emotions_output.csv")
+setwd("ucsf")
+goemo$Filename <- substr(goemo$file, 17,50) # get filename
+goemo$id <- sapply(strsplit(goemo$Filename, "_"), "[", 1)
+goemo$emo <- sapply(strsplit(goemo$Filename, "_"), "[", 2)
+goemo$thing <- sapply(strsplit(goemo$Filename, "_"), "[", 3)
+goemo$feeldescribe <- sapply(strsplit(goemo$Filename, "_"), "[", 4)
+goemo <- goemo[grep("feel",goemo$feeldescribe),]
+goemo$Filename <- paste(goemo$id,goemo$emo,goemo$thing, sep="_")
+# Create variable for joining
+data$Filename <- paste(data$participantID.y,data$stimulus,sep="_")
+#data$Filename <- paste(data$Filename,".txt",sep="")
+
+emo_unblind <- right_join(goemo,data,by="Filename")
+emo_unblind$Case <- substr(emo_unblind$Filename,1,1)
+data2 <- emo_unblind
+
+# Define emotions
+#emo_unblind <- emo_unblind %>% group_by(participantID.x) %>% summarise_all(funs(mean))
+emo_unblind$positive <- (emo_unblind$admiration + emo_unblind$amusement + emo_unblind$approval+
+                           emo_unblind$caring + emo_unblind$desire + emo_unblind$excitement + emo_unblind$gratitude + emo_unblind$joy +
+                           emo_unblind$love + emo_unblind$optimism + emo_unblind$pride + emo_unblind$relief)/12
+
+emo_unblind$negative <- (emo_unblind$anger + emo_unblind$annoyance + emo_unblind$disappointment +         
+                           emo_unblind$disapproval+emo_unblind$disgust+emo_unblind$embarrassment+
+                           emo_unblind$fear+emo_unblind$grief+emo_unblind$nervousness +
+                           emo_unblind$remorse+emo_unblind$sadness)/11
+
+emo_unblind2 <- emo_unblind[,c("positive","negative","neutral")]
+emo_unblind <- emo_unblind[ , -which(names(emo_unblind) %in% c("positive","negative","neutral"))]
+emo_unblind2 <- normalize.rows(as.matrix(emo_unblind2),method="manhattan")
+emo_unblind_norm <- cbind(emo_unblind,emo_unblind2)
+
+#data4 <- emo_unblind_norm %>% filter(Case == "7")
+# (1) average probability across all 1-positive, 2-negative and 3-neutral emotions
+emo_unblind_norm$Video <- paste(emo_unblind_norm$emo, emo_unblind_norm$thing, sep="_")
+data5 <- emo_unblind_norm %>% group_by(id, Video, drugCondition) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+data5 <- data5[-which(data5$Video %in% c("neu_yawns","NA_NA","neg_mygirl","neg_cafe","neg_bugbear")),]
+#joy
+```
+
+## Density of Positive Emotion for joy_baby By Group
+```{r pressure}
+data5 %>% filter(Video == "joy_baby") %>% ggplot(aes(x=positive, color=drugCondition))+geom_density()+
+  ggtitle("Density of Positive Emotion for joy_baby")
+```
+
+## Density of Positive Emotion for joy_grandpa By Group
+```{r grandpa}
+data5 %>% filter(Video == "joy_grandpa") %>% ggplot(aes(x=positive, color=drugCondition))+geom_density()+
+  ggtitle("Density of Positive Emotion for joy_grandpa")
+```
+
+## Density of Positive Emotion for joy_phone By Group
+```{r}
+data5 %>% filter(Video == "joy_phone") %>% ggplot(aes(x=positive, color=drugCondition))+geom_density()+
+  ggtitle("Density of Positive Emotion for joy_phone")
+```
+
+## Density of Positive Emotion for joy_dogfail By Group
+```{r}
+data5 %>% filter(Video == "joy_dogfail") %>% ggplot(aes(x=positive, color=drugCondition))+geom_density()+
+  ggtitle("Density of Positive Emotion for joy_dogfail")
+```
+
+## Density of Negative Emotion for neg_broken By Group
+```{r}
+data5 %>% filter(Video == "neg_broken") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_broken")
+```
+
+## Density of Negative Emotion for neg_dying By Group
+```{r}
+data5 %>% filter(Video == "neg_dying") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_dying")
+```
+
+## Density of Negative Emotion for neg_larva By Group
+```{r}
+data5 %>% filter(Video == "neg_larva") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_larva")
+```
+
+## Density of Negative Emotion for neg_lightsout By Group
+```{r}
+data5 %>% filter(Video == "neg_lightsout") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_lightsout")
+```
+
+## Density of Negative Emotion for neg_coffer By Group
+```{r}
+data5 %>% filter(Video == "neg_coffer") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_coffer")
+```
+
+## Density of Negative Emotion for neg_heart By Group
+```{r}
+data5 %>% filter(Video == "neg_heart") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_heart")
+```
+
+## Density of Negative Emotion for neg_nuts By Group
+```{r}
+data5 %>% filter(Video == "neg_nuts") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_nuts")
+```
+
+## Density of Negative Emotion for neg_bugear By Group
+```{r}
+data5 %>% filter(Video == "neg_bugear") %>% ggplot(aes(x=negative, color=drugCondition))+geom_density()+
+  ggtitle("Density of negative Emotion for neg_bugear")
+```
+
+## Density of Neutral Emotion for neu_cafe by Group
+```{r}
+data5 %>% filter(Video == "neu_cafe") %>% ggplot(aes(x=neutral, color=drugCondition))+geom_density()+
+  ggtitle("Density of Neutral Emotion for neu_cafe")
+```
+
+## Density of Neutral Emotion for neu_yawn by Group
+```{r}
+data5 %>% filter(Video == "neu_yawn") %>% ggplot(aes(x=neutral, color=drugCondition))+geom_density()+
+  ggtitle("Density of Neutral Emotion for neu_yawn")
+```
+
+
+```{r, include=FALSE}
+setwd("C:/Users/jakep/Dropbox/PORQ_dataForUW/evocativeVideoTask")
+coherence <- read.csv("coherenceresult.csv")
+library(ROCR)
+coherence$feeldescribe <- sapply(strsplit(coherence$file, "_"), "[", 4)
+coherence$feeldescribe <- gsub("\\..*","", coherence$feeldescribe )
+coherence$Group <- substr(coherence$file,1,1)
+coherence$id <- substr(coherence$file,1,4)
+```
+
+## WordMean Coherence Result for Feel/Describe by Group
+```{r, warning=FALSE, echo=FALSE}
+ggplot(coherence, aes(x=feeldescribe, y=wordmean, color=Group))+geom_boxplot()
+```
+
+## SentMean Coherence Result for Feel/Describe by Group
+```{r, warning=FALSE, echo=FALSE}
+ggplot(coherence, aes(x=feeldescribe, y=sentmean, color=Group))+geom_boxplot()
+```
+
+## PhraseMean Coherence Result for Feel/Describe by Group
+```{r, warning=FALSE, echo=FALSE}
+ggplot(coherence, aes(x=feeldescribe, y=phrasemean, color=Group))+geom_boxplot()
+```
+
+## Mean Coherence Scores as Sole Predictors in GLM
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+coherence$Group <- as.factor(coherence$Group)
+coherence$Case <- factor(coherence$Group,levels=c("7","8"))
+coherence$ID <- substr(coherence$file,1,4)
+
+coherence2 <- coherence %>% group_by(Case, ID) %>% summarise(mean(sentmean,na.rm=T))
+glm_sent <- glm(coherence2$Case~coherence2$"mean(sentmean, na.rm = T)",family = binomial())
+coherence3 <- coherence %>% group_by(Case, ID) %>% summarise(mean(wordmean,na.rm=T))
+glm_word <- glm(coherence3$Case~coherence3$"mean(wordmean, na.rm = T)",family = binomial())
+coherence4 <- coherence %>% group_by(Case, ID) %>% summarise(mean(phrasemean,na.rm=T))
+glm_phrase <- glm(coherence4$Case~coherence4$"mean(phrasemean, na.rm = T)",family = binomial())
+
+
+pred <- prediction( glm_sent$fitted.values, coherence2$Case )
+pred2 <- prediction( glm_word$fitted.values, coherence3$Case )
+pred3 <- prediction( glm_phrase$fitted.values, coherence4$Case )
+perf <- performance( pred, "tpr", "fpr" )
+perf2 <- performance(pred2, "tpr", "fpr")
+perf3 <- performance(pred3, "tpr", "fpr")
+plot( perf, col="red")
+text = performance(pred, "auc")@y.values
+text(1,0.25,labels=paste("Sent_AUC =",text,sep=" "))
+plot(perf2, col="blue",add = TRUE)
+text2 = performance(pred2, "auc")@y.values
+text(1,0.20,labels=paste("Word_AUC =",text2,sep=" "))
+plot(perf3, col="green", add=TRUE)
+text3 = performance(pred3, "auc")@y.values
+text(1,0.15,labels=paste("Phrase_AUC =",text3,sep=" "))
+legend("right", c("sentmean", "wordmean","phrasemean"), lty=1, 
+    col = c("red", "blue", "green"), bty="n", inset=c(0,-0.15))
+```
+
+## Min Coherence Scores as Sole Predictors in GLM
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+coherence2 <- coherence %>% group_by(Case, ID) %>% summarise(min(sentmean,na.rm=T))
+glm_sent <- glm(coherence2$Case~coherence2$"min(sentmean, na.rm = T)",family = binomial())
+coherence3 <- coherence %>% group_by(Case, ID) %>% summarise(min(wordmean,na.rm=T))
+glm_word <- glm(coherence3$Case~coherence3$"min(wordmean, na.rm = T)",family = binomial())
+coherence4 <- coherence %>% group_by(Case, ID) %>% summarise(min(phrasemean,na.rm=T))
+glm_phrase <- glm(coherence4$Case~coherence4$"min(phrasemean, na.rm = T)",family = binomial())
+
+
+pred <- prediction( glm_sent$fitted.values, coherence2$Case )
+pred2 <- prediction( glm_word$fitted.values, coherence3$Case )
+pred3 <- prediction( glm_phrase$fitted.values, coherence4$Case )
+perf <- performance( pred, "tpr", "fpr" )
+perf2 <- performance(pred2, "tpr", "fpr")
+perf3 <- performance(pred3, "tpr", "fpr")
+plot( perf, col="red")
+text = performance(pred, "auc")@y.values
+text(1,0.25,labels=paste("Sent_AUC =",text,sep=" "))
+plot(perf2, col="blue",add = TRUE)
+text2 = performance(pred2, "auc")@y.values
+text(1,0.20,labels=paste("Word_AUC =",text2,sep=" "))
+plot(perf3, col="green", add=TRUE)
+text3 = performance(pred3, "auc")@y.values
+text(1,0.15,labels=paste("Phrase_AUC =",text3,sep=" "))
+legend("right", c("sentmin", "wordmin","phrasemin"), lty=1, 
+    col = c("red", "blue", "green"), bty="n", inset=c(0,-0.15))
+```
+
+## Max Coherence Scores as Sole Predictors in GLM
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+coherence2 <- coherence %>% group_by(Case, ID) %>% summarise(max(sentmean,na.rm=T))
+glm_sent <- glm(coherence2$Case~coherence2$"max(sentmean, na.rm = T)",family = binomial())
+coherence3 <- coherence %>% group_by(Case, ID) %>% summarise(max(wordmean,na.rm=T))
+glm_word <- glm(coherence3$Case~coherence3$"max(wordmean, na.rm = T)",family = binomial())
+coherence4 <- coherence %>% group_by(Case, ID) %>% summarise(max(phrasemean,na.rm=T))
+glm_phrase <- glm(coherence4$Case~coherence4$"max(phrasemean, na.rm = T)",family = binomial())
+
+
+pred <- prediction( glm_sent$fitted.values, coherence2$Case )
+pred2 <- prediction( glm_word$fitted.values, coherence3$Case )
+pred3 <- prediction( glm_phrase$fitted.values, coherence4$Case )
+perf <- performance( pred, "tpr", "fpr" )
+perf2 <- performance(pred2, "tpr", "fpr")
+perf3 <- performance(pred3, "tpr", "fpr")
+plot( perf, col="red")
+text = performance(pred, "auc")@y.values
+text(1,0.25,labels=paste("Sent_AUC =",text,sep=" "))
+plot(perf2, col="blue",add = TRUE)
+text2 = performance(pred2, "auc")@y.values
+text(1,0.20,labels=paste("Word_AUC =",text2,sep=" "))
+plot(perf3, col="green", add=TRUE)
+text3 = performance(pred3, "auc")@y.values
+text(1,0.15,labels=paste("Phrase_AUC =",text3,sep=" "))
+legend("right", c("sentmax", "wordmax","phrasemax"), lty=1, 
+    col = c("red", "blue", "green"), bty="n", inset=c(0,-0.15))
+```
+
+## Min Coherence Scores as Sole Predictors in GLM
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+coherence2 <- coherence %>% group_by(Case, ID) %>% summarise(min(sentmean,na.rm=T))
+coherence2$id <- coherence2$ID
+emo_unblind_norm <- emo_unblind_norm %>% filter(drugCondition == "PL")
+data5 <- emo_unblind_norm %>% group_by(id, emo) %>% summarise_all(funs(mean(., na.rm = TRUE)))
+# data5 <- data5[-which(data5$Video %in% c("neu_yawns","NA_NA","neg_mygirl","neg_cafe","neg_bugbear")),]
+data5$Case <- substr(data5$id,1,1)
+data6 <- data5 %>% filter(emo == "joy")
+data6_r <- data6[,c("positive","negative")]
+data6_r <- normalize.rows(as.matrix(data6_r),method="manhattan")
+data6 <- data6[ , -which(names(data6) %in% c("positive","negative"))]
+data6_r <- as.data.frame(data6_r)
+data6_r2 <- cbind(data6,data6_r)
+data7 <- data5 %>% filter(emo=="neg")
+data7_r <- data7[,c("positive","negative")]
+data7_r <- normalize.rows(as.matrix(data7_r),method="manhattan")
+data7 <- data7[ , -which(names(data7) %in% c("positive","negative"))]
+data7_r <- as.data.frame(data7_r)
+data7_r2 <- cbind(data7,data7_r)
+data67 <- inner_join(data6_r2, data7_r2, by="id")
+data8 <- data5 %>% filter(emo == "neu")
+data678 <- inner_join(data67, data8, by="id")
+data678$trace <- data678$positive.x + data678$negative.y 
+#data5$VideoType <- substr(data5$Video,1,3)
+gocoh <- inner_join(coherence2, data678, by="id")
+gocoh$Case.x <- as.factor(gocoh$Case.x)
+glm_sent <- glm(gocoh$Case.x~gocoh$trace +gocoh$"min(sentmean, na.rm = T)",family = binomial())
+
+pred <- prediction( glm_sent$fitted.values, gocoh$Case.x )
+pred2 <- prediction( glm_word$fitted.values, coherence3$Case )
+pred3 <- prediction( glm_phrase$fitted.values, coherence4$Case )
+perf <- performance( pred, "tpr", "fpr" )
+perf2 <- performance(pred2, "tpr", "fpr")
+perf3 <- performance(pred3, "tpr", "fpr")
+plot( perf, col="red")
+text = performance(pred, "auc")@y.values
+text(1,0.25,labels=paste("Sent_AUC =",text,sep=" "))
+plot(perf2, col="blue",add = TRUE)
+text2 = performance(pred2, "auc")@y.values
+text(1,0.20,labels=paste("Word_AUC =",text2,sep=" "))
+plot(perf3, col="green", add=TRUE)
+text3 = performance(pred3, "auc")@y.values
+text(1,0.15,labels=paste("Phrase_AUC =",text3,sep=" "))
+legend("right", c("sentmin", "wordmin","phrasemin"), lty=1, 
+    col = c("red", "blue", "green"), bty="n", inset=c(0,-0.15))
+```
